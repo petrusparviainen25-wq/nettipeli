@@ -2,19 +2,22 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL Mini</title>
+<title>NHL Mini FIXED</title>
 <style>
 body { margin:0; background:#0b1d2a; color:white; text-align:center; }
 canvas { display:block; margin:auto; background:#e6f7ff; border:3px solid white; }
+button, select { margin:5px; padding:5px; }
 </style>
 </head>
 <body>
 
-<h2>🏒 NHL Mini</h2>
+<h2>🏒 NHL Mini (FIXED)</h2>
+
 <select id="mode">
   <option value="endless">Endless</option>
   <option value="time">Time Attack (60s)</option>
 </select>
+
 <button onclick="startGame()">Aloita</button>
 
 <p>Pisteet: <span id="score">0</span> | Aika: <span id="time">60</span></p>
@@ -46,6 +49,12 @@ document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
 document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
 
 function startGame(){
+
+  // 🔊 FIX: ääni toimii selaimessa
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+
   gameMode = document.getElementById("mode").value;
 
   player = { x:350, y:380, vx:0, vy:0 };
@@ -55,11 +64,15 @@ function startGame(){
   score = 0;
   time = 60;
   running = true;
+
+  document.getElementById("score").textContent = score;
+  document.getElementById("time").textContent = time;
 }
 
 function update(){
+  if(!running) return;
 
-  // 🧍‍♂️ luistelu (inertia)
+  // 🧍‍♂️ luistelu
   if(keys["w"]) player.vy -= 0.2;
   if(keys["s"]) player.vy += 0.2;
   if(keys["a"]) player.vx -= 0.2;
@@ -81,13 +94,14 @@ function update(){
     puck.vy += dy * -0.02;
   }
 
-  // kiekko liike
+  // kiekko
   puck.x += puck.vx;
   puck.y += puck.vy;
+
   puck.vx *= 0.99;
   puck.vy *= 0.99;
 
-  // laukaus (space)
+  // laukaus
   if(keys[" "]){
     puck.vx = (puck.x - player.x) * 0.3;
     puck.vy = -6;
@@ -113,16 +127,19 @@ function update(){
     puck.y = 250;
     puck.vx = 0;
     puck.vy = 0;
+
+    document.getElementById("score").textContent = score;
   }
 
-  // time mode
+  // ⏱ aika
   if(gameMode === "time"){
     time -= 1/60;
-    if(time <= 0) running = false;
-  }
+    document.getElementById("time").textContent = Math.max(0, Math.floor(time));
 
-  document.getElementById("score").textContent = score;
-  document.getElementById("time").textContent = Math.max(0, Math.floor(time));
+    if(time <= 0){
+      running = false;
+    }
+  }
 }
 
 function draw(){
@@ -144,12 +161,6 @@ function draw(){
   ctx.lineTo(canvas.width,150);
   ctx.stroke();
 
-  // crease
-  ctx.fillStyle="rgba(0,150,255,0.2)";
-  ctx.beginPath();
-  ctx.arc(350,60,40,0,Math.PI,true);
-  ctx.fill();
-
   // maalivahti
   ctx.fillStyle="purple";
   ctx.fillRect(goalie.x,40,80,20);
@@ -166,15 +177,16 @@ function draw(){
   ctx.fillStyle="black";
   ctx.fill();
 
-  if(!running){
+  // GAME OVER
+  if(!running && time === 0){
     ctx.fillStyle="black";
     ctx.font="40px Arial";
-    ctx.fillText("GAME OVER",250,200);
+    ctx.fillText("GAME OVER",250,220);
   }
 }
 
 function loop(){
-  if(running) update();
+  update();
   draw();
   requestAnimationFrame(loop);
 }
