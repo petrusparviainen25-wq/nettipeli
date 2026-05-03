@@ -126,8 +126,10 @@ let controlled="user";
 
 let velX=0,velZ=0;
 let score=0;
-
-// ===== INPUT =====
+let goalieDelay = 0;
+let goalieTargetX = 0;
+let goalieTargetZ = -38;
+ // ===== INPUT =====
 addEventListener("keydown",e=>keys[e.code]=true);
 addEventListener("keyup",e=>keys[e.code]=false);
 
@@ -243,40 +245,37 @@ function goalieSave(){
 // ===== GOALIE AI =====
 function goalieAI(){
 
-  // reagoi vain hyökkäysalueella
   if(puck.position.z > -20) return;
 
-  // 🥅 maalin keskipiste
-  const goalX = 0;
-  const goalZ = -40;
+  // 🎲 satunnainen viive 0.2–0.4s (20–40 framea)
+  if(goalieDelay <= 0){
+    
+    const goalX = 0;
+    const goalZ = -40;
 
-  // 🧠 suunta kiekolta maaliin
-  let dx = puck.position.x - goalX;
-  let dz = puck.position.z - goalZ;
+    let dx = puck.position.x - goalX;
+    let dz = puck.position.z - goalZ;
 
-  let len = Math.sqrt(dx*dx + dz*dz);
-  if(len < 0.001) return;
+    let len = Math.sqrt(dx*dx + dz*dz);
+    if(len < 0.001) return;
 
-  dx /= len;
-  dz /= len;
+    dx /= len;
+    dz /= len;
 
-  // 🎯 aggressiivisuus (kuinka ulos tulee)
-  const distance = Math.abs(puck.position.z + 40);
+    const distance = Math.abs(puck.position.z + 40);
+    const depth = Math.min(8, Math.max(4, 10 - distance * 0.2));
 
-// 🎯 dynaaminen depth (NHL-tyyli)
-const depth = Math.min(8, Math.max(4, 10 - distance * 0.2));
-  // 📍 maalivahdin target sijainti
-  let targetX = goalX + dx * depth;
-  let targetZ = goalZ + dz * depth;
+    goalieTargetX = goalX + dx * depth;
+    goalieTargetX = Math.max(-6, Math.min(6, goalieTargetX));
 
-  // 🥅 rajoita tolppien väliin
-  targetX = Math.max(-6, Math.min(6, targetX));
+    goalieDelay = 12 + Math.random() * 12; // 🧠 0.2–0.4s
+  }
 
-  // 🧊 smooth liike
-  goalie.position.x += (targetX - goalie.position.x) * 0.12;
-  goalie.position.z += (targetZ - goalie.position.z) * 0.12;
-}
-// ===== AI ENEMIES =====
+  goalieDelay--;
+
+  // 🧊 liike tapahtuu vasta “päivityksen jälkeen”
+  goalie.position.x += (goalieTargetX - goalie.position.x) * 0.12;
+}// ===== AI ENEMIES =====
 function ai(){
 
  // seuraa kiekkoa
