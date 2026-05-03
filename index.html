@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>Hockey Full Accuracy Fix</title>
+<title>Hockey Engine V4 Real Height</title>
 <style>
 body { margin:0; overflow:hidden; background:#000; }
 canvas { display:block; }
@@ -65,17 +65,16 @@ ice.rotation.x = -Math.PI/2;
 scene.add(ice);
 
 /////////////////////////////////////////////////////
-// 🥅 GOAL (HEIGHT FIX)
+// 🥅 GOAL (REAL SIZE + HEIGHT)
 /////////////////////////////////////////////////////
 
-function createGoal(){
+function makeGoal(){
 
   const g = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({color:0xff0000});
 
   const left = new THREE.Mesh(new THREE.BoxGeometry(0.4,8,0.4),mat);
   const right = new THREE.Mesh(new THREE.BoxGeometry(0.4,8,0.4),mat);
-
   const top = new THREE.Mesh(new THREE.BoxGeometry(12,0.4,0.4),mat);
 
   left.position.set(-6,4,-40);
@@ -85,7 +84,7 @@ function createGoal(){
   g.add(left,right,top);
   scene.add(g);
 }
-createGoal();
+makeGoal();
 
 /////////////////////////////////////////////////////
 // 🥅 GOALIE
@@ -102,7 +101,7 @@ scene.add(goalie);
 // 🏒 PLAYERS
 /////////////////////////////////////////////////////
 
-function makePlayer(color,z){
+function player(color,z){
   const p = new THREE.Mesh(
     new THREE.CapsuleGeometry(1.2,2,6,10),
     new THREE.MeshStandardMaterial({color})
@@ -112,10 +111,10 @@ function makePlayer(color,z){
   return p;
 }
 
-const user = makePlayer(0x0066ff,35);
-const teammate = makePlayer(0x3399ff,25);
-const ai = makePlayer(0xff3333,-35);
-const defender = makePlayer(0xff7777,-20);
+const user = player(0x0066ff,35);
+const teammate = player(0x3399ff,25);
+const ai = player(0xff3333,-35);
+const defender = player(0xff7777,-20);
 
 /////////////////////////////////////////////////////
 // 🧊 PUCK
@@ -135,15 +134,16 @@ scene.add(puck);
 let owner = "free";
 let vx = 0;
 let vz = 0;
+let vy = 0;
+
 let score = 0;
 
 let controlled = "user";
-let actionLock = false;
+let lock = false;
 
 let mouse = {x:0,y:0};
 
-// 🎯 SHOOT ACCURACY (85%)
-let shotAccuracy = 0.85;
+let shotAccuracy = 0.94;
 
 /////////////////////////////////////////////////////
 // 🎮 INPUT
@@ -174,7 +174,7 @@ function active(){
 function pickup(){
 
   if(owner !== "free") return;
-  if(actionLock) return;
+  if(lock) return;
 
   const p = active();
 
@@ -185,73 +185,76 @@ function pickup(){
 
   if(d < 3.5){
     owner = controlled;
-    vx = 0;
-    vz = 0;
+    vx = 0; vz = 0; vy = 0;
   }
 }
 
 /////////////////////////////////////////////////////
-// 🏒 SHOOT (85% ACCURACY FIXED)
+// 🎯 SHOOT (HEIGHT + 94% ACCURACY)
 /////////////////////////////////////////////////////
 
 function shoot(){
 
   if(owner !== controlled) return;
-  if(actionLock) return;
+  if(lock) return;
 
-  actionLock = true;
+  lock = true;
 
   let dx = mouse.x;
   let dz = mouse.y;
 
-  // 🎯 85% accuracy system
+  // 🎯 accuracy noise (small)
   let noise = (1 - shotAccuracy);
-
-  dx += (Math.random() - 0.5) * noise * 0.6;
-  dz += (Math.random() - 0.5) * noise * 0.6;
+  dx += (Math.random()-0.5)*noise*0.6;
+  dz += (Math.random()-0.5)*noise*0.6;
 
   let len = Math.sqrt(dx*dx + dz*dz);
-  if(len === 0){ actionLock=false; return; }
+  if(len === 0){ lock=false; return; }
 
   let power = 3.2;
+
+  // 🏒 HEIGHT SYSTEM (IMPORTANT)
+  // higher mouseY = higher shot
+  vy = -mouse.y * 2.2;
 
   vx = (dx/len)*power;
   vz = (dz/len)*power;
 
   owner = "free";
 
-  setTimeout(()=>actionLock=false,80);
+  setTimeout(()=>lock=false,80);
 }
 
 addEventListener("mousedown",shoot);
 
 /////////////////////////////////////////////////////
-// 🤝 PASS + SWITCH
+// 🤝 PASS
 /////////////////////////////////////////////////////
 
 function pass(){
 
   if(owner !== controlled) return;
-  if(actionLock) return;
+  if(lock) return;
 
-  actionLock = true;
+  lock = true;
 
-  const target = controlled === "user" ? teammate : user;
+  const t = controlled === "user" ? teammate : user;
 
-  const dx = target.position.x - active().position.x;
-  const dz = target.position.z - active().position.z;
+  const dx = t.position.x - active().position.x;
+  const dz = t.position.z - active().position.z;
 
   let len = Math.sqrt(dx*dx + dz*dz);
-  if(len === 0){ actionLock=false; return; }
+  if(len === 0){ lock=false; return; }
 
   vx = (dx/len)*2.6;
   vz = (dz/len)*2.6;
+  vy = 0;
 
   owner = "free";
 
   controlled = controlled === "user" ? "teammate" : "user";
 
-  setTimeout(()=>actionLock=false,80);
+  setTimeout(()=>lock=false,80);
 }
 
 addEventListener("keydown",e=>{
@@ -259,7 +262,7 @@ addEventListener("keydown",e=>{
 });
 
 /////////////////////////////////////////////////////
-// 🧊 PUCK PHYSICS
+// 🧊 PHYSICS (WITH HEIGHT)
 /////////////////////////////////////////////////////
 
 function physics(){
@@ -275,11 +278,59 @@ function physics(){
   puck.position.x += vx;
   puck.position.z += vz;
 
+  // 🏒 vertical motion (realistic arc)
+  puck.position.y += vy;
+  vy -= 0.12; // gravity
+
+  if(puck.position.y < 1){
+    puck.position.y = 1;
+    vy = 0;
+  }
+
   vx *= 0.96;
   vz *= 0.96;
+}
 
-  if(Math.abs(vx)<0.01) vx=0;
-  if(Math.abs(vz)<0.01) vz=0;
+/////////////////////////////////////////////////////
+// 🛡 BLOCK + SAVE SYSTEM
+/////////////////////////////////////////////////////
+
+function defense(){
+
+  // 🥅 goalie save
+  let dxg = puck.position.x - goalie.position.x;
+  let dzg = puck.position.z - goalie.position.z;
+  let dg = Math.sqrt(dxg*dxg + dzg*dzg);
+
+  if(dg < 2.2 && puck.position.z < -30){
+    vx *= -0.4;
+    vz *= -0.4;
+    vy *= 0.2;
+    puck.position.z += 2;
+
+    document.getElementById("msg").innerText = "SAVE!";
+    setTimeout(()=>document.getElementById("msg").innerText="",500);
+    return;
+  }
+
+  // 🛡 defenders block
+  for(let d of [ai, defender]){
+
+    let dx = puck.position.x - d.position.x;
+    let dz = puck.position.z - d.position.z;
+    let dist = Math.sqrt(dx*dx + dz*dz);
+
+    if(dist < 2){
+
+      vx *= -0.3;
+      vz *= -0.3;
+      vy *= 0.2;
+
+      document.getElementById("msg").innerText = "BLOCK!";
+      setTimeout(()=>document.getElementById("msg").innerText="",400);
+      return;
+    }
+  }
 }
 
 /////////////////////////////////////////////////////
@@ -293,11 +344,10 @@ function aiLogic(){
 }
 
 /////////////////////////////////////////////////////
-// 🥅 GOALIE
+// 🥅 GOALIE MOVE
 /////////////////////////////////////////////////////
 
 function goalieAI(){
-
   goalie.position.x += (puck.position.x - goalie.position.x)*0.08;
   goalie.position.x = Math.max(-6,Math.min(6,goalie.position.x));
 }
@@ -322,8 +372,7 @@ function goal(){
 function reset(){
 
   puck.position.set(0,1,0);
-  vx = 0;
-  vz = 0;
+  vx = 0; vz = 0; vy = 0;
   owner = "free";
   controlled = "user";
 
@@ -347,6 +396,7 @@ function loop(){
 
   pickup();
   physics();
+  defense();
   aiLogic();
   goalieAI();
 
@@ -358,7 +408,6 @@ function loop(){
       "0 - " + score;
 
     document.getElementById("msg").innerText = "GOAL!";
-
     setTimeout(()=>document.getElementById("msg").innerText="",800);
 
     reset();
