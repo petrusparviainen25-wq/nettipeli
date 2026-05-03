@@ -242,10 +242,22 @@ function goalieSave(){
 
 // ===== GOALIE AI =====
 function goalieAI(){
- const target=puck.position.x;
- goalie.position.x+=(target-goalie.position.x)*0.1;
-}
 
+  // 🧠 reagoi vain kun kiekko hyökkäysalueella
+  if(puck.position.z > -20) return;
+
+  // 🎯 ennakointi mutta hillitty
+  let predict = puck.position.x + vx * 6;
+
+  // 🥅 rajoitus tolppien väliin
+  predict = Math.max(-6, Math.min(6, predict));
+
+  // 🧊 liike (ei karkaa)
+  goalie.position.x += (predict - goalie.position.x) * 0.08;
+
+  // 🔒 lukitaan maaliviivalle
+  goalie.position.z = -38;
+}
 // ===== AI ENEMIES =====
 function ai(){
 
