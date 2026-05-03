@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>Hockey Engine v2</title>
+<title>NHL v3 PRO SIM</title>
 <style>
 body { margin:0; overflow:hidden; background:#000; }
 canvas { display:block; }
@@ -14,18 +14,27 @@ canvas { display:block; }
   color:white;
   font-family:Arial;
 }
+
+#msg {
+  position:absolute;
+  top:50px;
+  left:10px;
+  color:yellow;
+  font-size:20px;
+}
 </style>
 </head>
 <body>
 
 <div id="hud">SINÄ 0 - 0 AI</div>
+<div id="msg"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
 <script>
 
 /////////////////////////////////////////////////////
-// 🌍 SCENE
+// 🌍 WORLD
 /////////////////////////////////////////////////////
 
 const scene = new THREE.Scene();
@@ -60,23 +69,29 @@ ice.rotation.x = -Math.PI/2;
 scene.add(ice);
 
 /////////////////////////////////////////////////////
-// 🧱 BOARDS (TÄRKEÄ UUTUUS)
+// 🥅 GOAL (REAL FRAME)
 /////////////////////////////////////////////////////
 
-const boardMat = new THREE.MeshStandardMaterial({color:0xffffff});
+function makeGoal(){
 
-function board(x,z,w,h){
-  const b = new THREE.Mesh(new THREE.BoxGeometry(w,2,h),boardMat);
-  b.position.set(x,1,z);
-  scene.add(b);
-  return b;
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({color:0xffffff});
+
+  const left = new THREE.Mesh(new THREE.BoxGeometry(0.2,4,0.2),mat);
+  const right = new THREE.Mesh(new THREE.BoxGeometry(0.2,4,0.2),mat);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(7,0.2,0.2),mat);
+
+  left.position.set(-3.5,2,-40);
+  right.position.set(3.5,2,-40);
+  top.position.set(0,4,-40);
+
+  g.add(left,right,top);
+  scene.add(g);
+
+  return g;
 }
 
-// kentän reunat
-board(0,60,180,2);
-board(0,-60,180,2);
-board(90,0,2,120);
-board(-90,0,2,120);
+const goal = makeGoal();
 
 /////////////////////////////////////////////////////
 // 🏒 PLAYER
@@ -88,23 +103,16 @@ function player(color,z){
     new THREE.MeshStandardMaterial({color})
   );
   p.position.set(0,2,z);
+
+  p.stamina = 1;
+  p.state = "skate";
+
   scene.add(p);
   return p;
 }
 
 const user = player(0x0066ff,35);
 const ai = player(0xff3333,-35);
-
-/////////////////////////////////////////////////////
-// 🥅 GOALIE
-/////////////////////////////////////////////////////
-
-const goalie = new THREE.Mesh(
-  new THREE.CapsuleGeometry(1.6,2.6,6,10),
-  new THREE.MeshStandardMaterial({color:0xffffff})
-);
-goalie.position.set(0,2,-38);
-scene.add(goalie);
 
 /////////////////////////////////////////////////////
 // 🏒 PUCK
@@ -132,7 +140,7 @@ addEventListener("mousemove",e=>{
 });
 
 /////////////////////////////////////////////////////
-// 🧠 STATE
+// 🧠 GAME STATE
 /////////////////////////////////////////////////////
 
 let vx=0,vz=0;
@@ -140,69 +148,85 @@ let hasPuck=false;
 let score=0;
 
 /////////////////////////////////////////////////////
-// 🏒 SHOOT (physics impulse)
+// 🎞️ REPLAY BUFFER
+/////////////////////////////////////////////////////
+
+let replay = [];
+
+function saveReplay(){
+  replay.push({
+    x:puck.position.x,
+    z:puck.position.z
+  });
+  if(replay.length>120) replay.shift();
+}
+
+/////////////////////////////////////////////////////
+// 🏒 PASS SYSTEM
+/////////////////////////////////////////////////////
+
+function pass(){
+  if(!hasPuck) return;
+
+  vx = (ai.position.x - user.position.x)*0.25;
+  vz = (ai.position.z - user.position.z)*0.25;
+
+  hasPuck=false;
+}
+
+addEventListener("keydown",e=>{
+  if(e.code==="Space") pass();
+});
+
+/////////////////////////////////////////////////////
+// 🏒 SHOOT (FIXED: LÄHTEE LAVASTA)
 /////////////////////////////////////////////////////
 
 addEventListener("mousedown",()=>{
 
   if(!hasPuck) return;
 
-  const dirX = mouse.x;
-  const dirZ = mouse.y;
+  const dx = mouse.x;
+  const dz = mouse.y;
 
-  const len = Math.sqrt(dirX*dirX+dirZ*dirZ);
+  const len = Math.sqrt(dx*dx+dz*dz);
 
-  vx = (dirX/len) * 1.5;
-  vz = (dirZ/len) * 1.5;
+  const nx = dx/len;
+  const nz = dz/len;
 
-  hasPuck=false;
+  const power = 1.6;
+
+  // 👉 tärkeä: pelaajan nopeus mukaan (stick impulse)
+  vx = nx * power + user.position.x*0.01;
+  vz = nz * power;
+
+  hasPuck = false;
 });
 
 /////////////////////////////////////////////////////
-// 🤖 AI FORMATION (2-1-2 basic)
+// 🤖 AI FORMATION (2-1-2 simplified)
 /////////////////////////////////////////////////////
 
-function aiFormation(){
+function aiBrain(){
 
-  // center
+  const attack = puck.position.z < -5;
+
   ai.position.x += (puck.position.x - ai.position.x)*0.05;
 
-  // puolustusvyöhyke
-  if(puck.position.z < 10){
-    ai.position.z += 0.04;
-  } else {
-    ai.position.z -= 0.02;
-  }
+  ai.position.z += attack ? 0.06 : -0.03;
 
-  ai.position.x = Math.max(-80,Math.min(80,ai.position.x));
 }
 
 /////////////////////////////////////////////////////
-// 🥅 GOALIE AI (angle block)
+// 🥅 GOAL CHECK (REAL BOX)
 /////////////////////////////////////////////////////
 
-function goalieAI(){
-
-  const target = puck.position.x;
-
-  goalie.position.x += (target - goalie.position.x)*0.12;
-  goalie.position.x = Math.max(-6,Math.min(6,goalie.position.x));
-  goalie.position.z = -38;
-}
-
-/////////////////////////////////////////////////////
-// 🧱 BOARD COLLISIONS (TÄRKEÄ FIX)
-/////////////////////////////////////////////////////
-
-function boardCollision(){
-
-  if(puck.position.x > 88 || puck.position.x < -88){
-    vx *= -0.7;
-  }
-
-  if(puck.position.z > 58 || puck.position.z < -58){
-    vz *= -0.7;
-  }
+function goalCheck(){
+  return (
+    puck.position.z < -40 &&
+    puck.position.x > -3.5 &&
+    puck.position.x < 3.5
+  );
 }
 
 /////////////////////////////////////////////////////
@@ -216,7 +240,6 @@ function reset(){
 
   user.position.set(0,2,35);
   ai.position.set(0,2,-35);
-  goalie.position.set(0,2,-38);
 }
 
 /////////////////////////////////////////////////////
@@ -227,19 +250,24 @@ function loop(){
 
   requestAnimationFrame(loop);
 
+  saveReplay();
+
   /////////////////////////////////////////////////////
-  // PLAYER SKATE (momentum feel)
+  // PLAYER MOVE + STAMINA
   /////////////////////////////////////////////////////
 
-  let speed=0.9;
+  let speed = 0.9 * user.stamina;
 
   if(keys["KeyA"]) user.position.x -= speed;
   if(keys["KeyD"]) user.position.x += speed;
   if(keys["KeyW"]) user.position.z -= speed;
   if(keys["KeyS"]) user.position.z += speed;
 
+  user.stamina *= 0.995;
+  user.stamina = Math.min(1,user.stamina+0.002);
+
   /////////////////////////////////////////////////////
-  // PUCK PICKUP
+  // PUCK PICKUP (stick control)
   /////////////////////////////////////////////////////
 
   let dx=puck.position.x-user.position.x;
@@ -249,53 +277,49 @@ function loop(){
   if(dist<3.5) hasPuck=true;
 
   /////////////////////////////////////////////////////
-  // PUCK PHYSICS (ice friction)
+  // PUCK PHYSICS
   /////////////////////////////////////////////////////
 
   if(hasPuck){
     puck.position.x=user.position.x;
     puck.position.z=user.position.z-2;
   } else {
-    puck.position.x+=vx;
-    puck.position.z+=vz;
+    puck.position.x += vx;
+    puck.position.z += vz;
 
-    vx*=0.96;
-    vz*=0.96;
+    vx*=0.965;
+    vz*=0.965;
   }
 
   /////////////////////////////////////////////////////
-  // SYSTEMS
+  // AI
   /////////////////////////////////////////////////////
 
-  aiFormation();
-  goalieAI();
-  boardCollision();
-
-  /////////////////////////////////////////////////////
-  // SAVE
-  /////////////////////////////////////////////////////
-
-  if(puck.position.z<-37 &&
-     Math.abs(puck.position.x-goalie.position.x)<3){
-    vx*=-0.5;
-  }
+  aiBrain();
 
   /////////////////////////////////////////////////////
   // GOAL
   /////////////////////////////////////////////////////
 
-  if(puck.position.z<-40){
+  if(goalCheck()){
+
     score++;
+
     document.getElementById("hud").innerText=
       "SINÄ "+score+" - AI 0";
+
+    document.getElementById("msg").innerText="GOAL!";
+
+    setTimeout(()=>document.getElementById("msg").innerText="",900);
+
     reset();
   }
 
   /////////////////////////////////////////////////////
-  // CAMERA (broadcast style)
+  // CAMERA
   /////////////////////////////////////////////////////
 
-  camera.position.x+=(user.position.x-camera.position.x)*0.04;
+  camera.position.x += (user.position.x-camera.position.x)*0.04;
   camera.lookAt(user.position.x,0,0);
 
   renderer.render(scene,camera);
