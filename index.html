@@ -261,8 +261,10 @@ function goalieAI(){
   dz /= len;
 
   // 🎯 aggressiivisuus (kuinka ulos tulee)
-  const depth = 6; // pienempi = syvemmällä maalissa
+  const distance = Math.abs(puck.position.z + 40);
 
+// 🎯 dynaaminen depth (NHL-tyyli)
+const depth = Math.min(8, Math.max(4, 10 - distance * 0.2));
   // 📍 maalivahdin target sijainti
   let targetX = goalX + dx * depth;
   let targetZ = goalZ + dz * depth;
