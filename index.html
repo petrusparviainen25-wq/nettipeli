@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL PRO PELI</title>
+<title>NHL ULTIMATE ENGINE</title>
 <style>
 body { margin:0; overflow:hidden; background:#000; }
 canvas { display:block; }
@@ -15,18 +15,28 @@ canvas { display:block; }
   font-family:Arial;
   font-size:18px;
 }
+
+#goal {
+  position:absolute;
+  top:50px;
+  left:10px;
+  color:yellow;
+  font-family:Arial;
+  font-size:22px;
+}
 </style>
 </head>
 <body>
 
 <div id="hud">SINÄ 0 - 0 AI</div>
+<div id="goal"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
 <script>
 
 //////////////////////////////
-// 🌍 MAAILMA
+// 🌍 WORLD
 //////////////////////////////
 
 const scene = new THREE.Scene();
@@ -34,19 +44,19 @@ scene.background = new THREE.Color(0x9fd3ff);
 
 scene.add(new THREE.AmbientLight(0xffffff,0.7));
 
-const valo = new THREE.DirectionalLight(0xffffff,1.5);
-valo.position.set(10,30,10);
-scene.add(valo);
+const sun = new THREE.DirectionalLight(0xffffff,1.5);
+sun.position.set(10,30,10);
+scene.add(sun);
 
 //////////////////////////////
-// 🎥 KAMERA (TV-KAMERA)
+// 🎥 CAMERA (TV STYLE)
 //////////////////////////////
 
-const kamera = new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.1,1000);
-kamera.position.set(0,28,55);
+const camera = new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.1,1000);
+camera.position.set(0,28,55);
 
 //////////////////////////////
-// 🖥️ RENDER
+// 🖥️ RENDERER
 //////////////////////////////
 
 const renderer = new THREE.WebGLRenderer({antialias:true});
@@ -54,230 +64,227 @@ renderer.setSize(innerWidth,innerHeight);
 document.body.appendChild(renderer.domElement);
 
 //////////////////////////////
-// 🧊 JÄÄ (parempi väri)
+// 🧊 ICE (real feel)
 //////////////////////////////
 
-const jää = new THREE.Mesh(
-  new THREE.PlaneGeometry(160,100),
+const ice = new THREE.Mesh(
+  new THREE.PlaneGeometry(180,110),
   new THREE.MeshStandardMaterial({
     color:0xdff6ff,
-    roughness:0.05,
-    metalness:0.2
+    roughness:0.06,
+    metalness:0.15
   })
 );
-jää.rotation.x = -Math.PI/2;
-scene.add(jää);
+ice.rotation.x = -Math.PI/2;
+scene.add(ice);
 
 //////////////////////////////
-// 🏒 PELAAJAT
+// 🏒 OBJECTS
 //////////////////////////////
 
-function teePelaaja(väri,z){
-  const m = new THREE.Mesh(
+function player(color,z){
+  const p = new THREE.Mesh(
     new THREE.CapsuleGeometry(1.2,2,4,8),
-    new THREE.MeshStandardMaterial({color:väri})
+    new THREE.MeshStandardMaterial({color})
   );
-  m.position.set(0,2,z);
-  scene.add(m);
-  return m;
+  p.position.set(0,2,z);
+  scene.add(p);
+  return p;
 }
 
-const pelaaja = teePelaaja(0x0066ff,35);
-const AI = teePelaaja(0xff3333,-35);
+const user = player(0x0066ff,35);
+const bot = player(0xff3333,-35);
 
-//////////////////////////////
-// 🥅 MAAALIVAHTI
-//////////////////////////////
-
-const mv = new THREE.Mesh(
+const goalie = new THREE.Mesh(
   new THREE.CapsuleGeometry(1.5,2.5,4,8),
   new THREE.MeshStandardMaterial({color:0xffffff})
 );
-mv.position.set(0,2,-38);
-scene.add(mv);
+goalie.position.set(0,2,-38);
+scene.add(goalie);
 
-//////////////////////////////
-// 🏒 KIEKKO
-//////////////////////////////
-
-const kiekko = new THREE.Mesh(
+const puck = new THREE.Mesh(
   new THREE.CylinderGeometry(1,1,0.5,16),
   new THREE.MeshStandardMaterial({color:0x000000})
 );
-kiekko.rotation.x = Math.PI/2;
-scene.add(kiekko);
+puck.rotation.x = Math.PI/2;
+scene.add(puck);
 
 //////////////////////////////
 // 🎮 INPUT
 //////////////////////////////
 
-let näppäimet = {};
-addEventListener("keydown",e=>näppäimet[e.code]=true);
-addEventListener("keyup",e=>näppäimet[e.code]=false);
+let keys = {};
+addEventListener("keydown",e=>keys[e.code]=true);
+addEventListener("keyup",e=>keys[e.code]=false);
 
-let hiiri = {x:0,y:0};
+let mouse = {x:0,y:0};
 addEventListener("mousemove",e=>{
-  hiiri.x = (e.clientX/innerWidth - 0.5)*2;
-  hiiri.y = (e.clientY/innerHeight - 0.5)*2;
+  mouse.x=(e.clientX/innerWidth-0.5)*2;
+  mouse.y=(e.clientY/innerHeight-0.5)*2;
 });
 
 //////////////////////////////
-// 🧠 PELIN TILA
+// 🧠 STATE
 //////////////////////////////
 
-let vx = 0;
-let vz = 0;
-let omistus = false;
-let pisteet = 0;
+let vx=0,vz=0;
+let hasPuck=false;
+
+let score=0;
 
 //////////////////////////////
-// 🎯 LAUKAUS
+// 🏒 SHOOT SYSTEM (AAA feel)
 //////////////////////////////
 
 addEventListener("mousedown",()=>{
 
-  if(!omistus) return;
+  if(!hasPuck) return;
 
-  const kohdeX = pelaaja.position.x + hiiri.x*25;
-  const kohdeZ = pelaaja.position.z + hiiri.y*25 - 15;
+  const aimX = user.position.x + mouse.x*30;
+  const aimZ = user.position.z + mouse.y*30 - 15;
 
-  vx = (kohdeX - pelaaja.position.x) * 0.35;
-  vz = (kohdeZ - pelaaja.position.z) * 0.35;
+  vx = (aimX - user.position.x) * 0.28;
+  vz = (aimZ - user.position.z) * 0.28;
 
-  omistus = false;
+  hasPuck=false;
 });
 
 //////////////////////////////
-// 🤖 AI LOGIIKKA
+// 🤖 AI (intent-based)
 //////////////////////////////
 
 function ai(){
 
-  AI.position.x += (kiekko.position.x - AI.position.x) * 0.06;
-  AI.position.z += (kiekko.position.z < -10 ? 0.06 : -0.02);
+  let attack = puck.position.z < -5 ? 0.07 : -0.03;
 
-  AI.position.x = Math.max(-60,Math.min(60,AI.position.x));
-  AI.position.z = Math.max(-40,Math.min(-5,AI.position.z));
+  bot.position.x += (puck.position.x - bot.position.x)*0.06;
+  bot.position.z += attack;
+
+  bot.position.x = clamp(bot.position.x,-65,65);
+  bot.position.z = clamp(bot.position.z,-45,-5);
 }
 
 //////////////////////////////
-// 🥅 MAAALIVAHTI
+// 🥅 GOALIE (reaction + angle)
 //////////////////////////////
 
-function maalivahti(){
+function goalieAI(){
 
-  mv.position.x += (kiekko.position.x - mv.position.x) * 0.1;
-  mv.position.x = Math.max(-6,Math.min(6,mv.position.x));
-  mv.position.z = -38;
+  goalie.position.x += (puck.position.x - goalie.position.x)*0.1;
+  goalie.position.x = clamp(goalie.position.x,-6,6);
+  goalie.position.z = -38;
 }
+
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 
 //////////////////////////////
 // 🔁 RESET
 //////////////////////////////
 
 function reset(){
-  kiekko.position.set(0,1,0);
-  vx = 0;
-  vz = 0;
-  omistus = false;
+  puck.position.set(0,1,0);
+  vx=0;vz=0;
+  hasPuck=false;
 
-  pelaaja.position.set(0,2,35);
-  AI.position.set(0,2,-35);
-  mv.position.set(0,2,-38);
+  user.position.set(0,2,35);
+  bot.position.set(0,2,-35);
+  goalie.position.set(0,2,-38);
 }
 
 //////////////////////////////
-// 🔄 PELISILMUKKA
+// 🎮 MAIN LOOP
 //////////////////////////////
 
-function peli(){
+function loop(){
 
-  requestAnimationFrame(peli);
-
-  //////////////////////////
-  // 🏃 PELAAJAN LIIKE
-  //////////////////////////
-
-  if(näppäimet["KeyA"]) pelaaja.position.x -= 0.8;
-  if(näppäimet["KeyD"]) pelaaja.position.x += 0.8;
-  if(näppäimet["KeyW"]) pelaaja.position.z -= 0.8;
-  if(näppäimet["KeyS"]) pelaaja.position.z += 0.8;
-
-  pelaaja.position.x = Math.max(-60,Math.min(60,pelaaja.position.x));
-  pelaaja.position.z = Math.max(-15,Math.min(60,pelaaja.position.z));
+  requestAnimationFrame(loop);
 
   //////////////////////////
-  // 🏒 KIEKON POIMINTA
+  // PLAYER MOVEMENT
   //////////////////////////
 
-  let dx = kiekko.position.x - pelaaja.position.x;
-  let dz = kiekko.position.z - pelaaja.position.z;
-  let etäisyys = Math.sqrt(dx*dx+dz*dz);
+  let speed = 0.9;
 
-  if(etäisyys < 3.5) omistus = true;
+  if(keys["KeyA"]) user.position.x -= speed;
+  if(keys["KeyD"]) user.position.x += speed;
+  if(keys["KeyW"]) user.position.z -= speed;
+  if(keys["KeyS"]) user.position.z += speed;
+
+  user.position.x = clamp(user.position.x,-65,65);
+  user.position.z = clamp(user.position.z,-20,60);
 
   //////////////////////////
-  // 🏒 KIEKKO
+  // PUCK PICKUP
   //////////////////////////
 
-  if(omistus){
-    kiekko.position.x = pelaaja.position.x;
-    kiekko.position.z = pelaaja.position.z - 2;
-    kiekko.position.y = 1;
+  let dx = puck.position.x - user.position.x;
+  let dz = puck.position.z - user.position.z;
+  let dist = Math.sqrt(dx*dx+dz*dz);
+
+  if(dist < 3.5) hasPuck = true;
+
+  //////////////////////////
+  // PUCK PHYSICS
+  //////////////////////////
+
+  if(hasPuck){
+    puck.position.x = user.position.x;
+    puck.position.z = user.position.z - 2;
+    puck.position.y = 1;
   } else {
-    kiekko.position.x += vx;
-    kiekko.position.z += vz;
+    puck.position.x += vx;
+    puck.position.z += vz;
 
-    vx *= 0.96;
-    vz *= 0.96;
+    vx *= 0.965;
+    vz *= 0.965;
   }
 
   //////////////////////////
-  // 🤖 AI
+  // AI + GOALIE
   //////////////////////////
 
   ai();
-  maalivahti();
+  goalieAI();
 
   //////////////////////////
-  // 🥅 TORJUNTA
+  // SAVE SYSTEM
   //////////////////////////
 
-  if(kiekko.position.z < -37 &&
-     Math.abs(kiekko.position.x - mv.position.x) < 3){
-    vx *= -0.6;
+  if(puck.position.z < -37 &&
+     Math.abs(puck.position.x - goalie.position.x) < 3){
+    vx *= -0.55;
   }
 
   //////////////////////////
-  // 🏆 MAALI
+  // GOAL
   //////////////////////////
 
-  if(kiekko.position.z < -40){
-    pisteet++;
+  if(puck.position.z < -40){
+    score++;
     document.getElementById("hud").innerText =
-      "MAALI! SINÄ " + pisteet;
+      "SINÄ " + score + " - AI 0";
+
+    document.getElementById("goal").innerText = "GOAL!";
+    setTimeout(()=>document.getElementById("goal").innerText="",800);
+
     reset();
   }
 
   //////////////////////////
-  // 🎥 KAMERA SEURAA
+  // CAMERA (broadcast feel)
   //////////////////////////
 
-  kamera.position.x += (pelaaja.position.x - kamera.position.x)*0.04;
-  kamera.lookAt(pelaaja.position.x,0,0);
+  camera.position.x += (user.position.x - camera.position.x)*0.04;
+  camera.lookAt(user.position.x,0,0);
 
-  renderer.render(scene,kamera);
+  renderer.render(scene,camera);
 }
 
-peli();
-
-//////////////////////////////
-// 📏 RESIZE
-//////////////////////////////
+loop();
 
 addEventListener("resize",()=>{
-  kamera.aspect = innerWidth/innerHeight;
-  kamera.updateProjectionMatrix();
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
 });
 
