@@ -2,61 +2,34 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL</title>
-
+<title>NHL SAFE FULL</title>
 <style>
 body { margin:0; overflow:hidden; }
 canvas { display:block; }
-#hud{
-  position:absolute;
-  top:10px;
-  left:10px;
-  color:white;
-  font-family:Arial;
-  font-size:20px;
-}
 </style>
 </head>
 <body>
-
-<div id="hud">0 - 0</div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
 <script>
 
-/////////////////////////////////////////////////////
-// 🌍 SCENE (SAFE)
-/////////////////////////////////////////////////////
-const ai = player(0xff3333, -5, -20);
-const defender = player(0xff7777, 5, -15);
- const scene = new THREE.Scene();
+const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87cfff);
 
-const camera = new THREE.PerspectiveCamera(
-  70, innerWidth/innerHeight, 0.1, 1000
-);
-
-camera.position.set(0, 30, 60);
-camera.lookAt(0, 0, 0);
+const camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 1000);
+camera.position.set(0, 25, 60);
+camera.lookAt(0,0,0);
 
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
-/////////////////////////////////////////////////////
-// 💡 LIGHTS
-/////////////////////////////////////////////////////
+scene.add(new THREE.AmbientLight(0xffffff,1.2));
 
-scene.add(new THREE.AmbientLight(0xffffff, 1));
-
-const light = new THREE.DirectionalLight(0xffffff, 1.2);
+const light = new THREE.DirectionalLight(0xffffff,1.5);
 light.position.set(10,30,10);
 scene.add(light);
-
-/////////////////////////////////////////////////////
-// 🧊 ICE
-/////////////////////////////////////////////////////
 
 const ice = new THREE.Mesh(
   new THREE.PlaneGeometry(200,120),
@@ -65,35 +38,10 @@ const ice = new THREE.Mesh(
 ice.rotation.x = -Math.PI/2;
 scene.add(ice);
 
-/////////////////////////////////////////////////////
-// 🥅 GOAL (VISUAL SAFE)
-/////////////////////////////////////////////////////
-
-function makeGoal(){
-  const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({color:0xff0000});
-
-  const l = new THREE.Mesh(new THREE.BoxGeometry(0.5,8,0.5),mat);
-  const r = new THREE.Mesh(new THREE.BoxGeometry(0.5,8,0.5),mat);
-  const t = new THREE.Mesh(new THREE.BoxGeometry(12,0.5,0.5),mat);
-
-  l.position.set(-6,4,-40);
-  r.position.set(6,4,-40);
-  t.position.set(0,8,-40);
-
-  g.add(l,r,t);
-  scene.add(g);
-}
-makeGoal();
-
-/////////////////////////////////////////////////////
-// 🧍 PLAYER
-/////////////////////////////////////////////////////
-
-function player(color,x,z){
+function player(c,x,z){
   const p = new THREE.Mesh(
     new THREE.CapsuleGeometry(1.2,2,6,10),
-    new THREE.MeshStandardMaterial({color})
+    new THREE.MeshStandardMaterial({color:c})
   );
   p.position.set(x,2,z);
   scene.add(p);
@@ -101,11 +49,9 @@ function player(color,x,z){
 }
 
 const user = player(0x0066ff,0,30);
-const teammate = player(0x3399ff,6,30);
-
-/////////////////////////////////////////////////////
-// 🏒 PUCK
-/////////////////////////////////////////////////////
+const team = player(0x3399ff,6,30);
+const ai1 = player(0xff3333,-5,-20);
+const ai2 = player(0xff7777,5,-15);
 
 const puck = new THREE.Mesh(
   new THREE.CylinderGeometry(1,1,0.5,16),
@@ -115,19 +61,10 @@ puck.rotation.x = Math.PI/2;
 puck.position.set(0,1,0);
 scene.add(puck);
 
-/////////////////////////////////////////////////////
-// 🧠 STATE
-/////////////////////////////////////////////////////
-
-let controlled = "user";
-let vx=0, vz=0;
-let mouse={x:0,y:0};
+let controlled="user";
+let vx=0,vz=0,vy=0;
 let keys={};
-let score=0;
-
-/////////////////////////////////////////////////////
-// INPUT
-/////////////////////////////////////////////////////
+let mouse={x:0,y:0};
 
 addEventListener("keydown",e=>keys[e.code]=true);
 addEventListener("keyup",e=>keys[e.code]=false);
@@ -137,82 +74,53 @@ addEventListener("mousemove",e=>{
   mouse.y=(e.clientY/innerHeight-0.5)*2;
 });
 
-/////////////////////////////////////////////////////
-// ACTIVE PLAYER
-/////////////////////////////////////////////////////
-
 function active(){
-  return controlled==="user"?user:teammate;
+  return controlled==="user"?user:team;
 }
-
-/////////////////////////////////////////////////////
-// MOVE
-/////////////////////////////////////////////////////
 
 function move(){
   const p=active();
-
   if(keys["KeyA"])p.position.x-=0.8;
   if(keys["KeyD"])p.position.x+=0.8;
   if(keys["KeyW"])p.position.z-=0.8;
   if(keys["KeyS"])p.position.z+=0.8;
 }
 
-/////////////////////////////////////////////////////
-// PICKUP (SAFE)
-/////////////////////////////////////////////////////
-
-function pickup(){
+function hasPuck(){
   const p=active();
-
   let dx=puck.position.x-p.position.x;
   let dz=puck.position.z-p.position.z;
-
-  if(Math.sqrt(dx*dx+dz*dz)<3.5){
-    puck.position.x=p.position.x;
-    puck.position.z=p.position.z-2;
-    puck.position.y=1;
-  }
+  return Math.sqrt(dx*dx+dz*dz)<3.5;
 }
 
-/////////////////////////////////////////////////////
-// SHOOT (WORKING SIMPLE)
-/////////////////////////////////////////////////////
+function pickup(){
+  if(!hasPuck()) return;
+  const p=active();
+  puck.position.x=p.position.x;
+  puck.position.z=p.position.z-2;
+  puck.position.y=1;
+}
 
 function shoot(){
+  if(!hasPuck()) return;
 
-  const p = active();
+  let dx=mouse.x;
+  let dz=mouse.y;
 
-  let dx = mouse.x;
-  let dz = mouse.y;
+  let len=Math.sqrt(dx*dx+dz*dz);
+  if(len===0){dx=0;dz=-1;len=1;}
 
-  let len = Math.sqrt(dx*dx + dz*dz);
-  if(len === 0){
-    dx = 0;
-    dz = -1;
-    len = 1;
-  }
+  vx=(dx/len)*3.2;
+  vz=(dz/len)*3.2;
+  vy=Math.max(0,-mouse.y*2);
+}
 
-  // 🎯 95% accuracy (very small spread)
-  const spread = 0.03;
-
-  dx += (Math.random()-0.5) * spread;
-  dz += (Math.random()-0.5) * spread;
-
-  vx = (dx/len) * 3.2;
-  vz = (dz/len) * 3.2;
-
-  // 🟢 HEIGHT SYSTEM (TÄRKEIN LISÄYS)
-  // mouse.y < 0 = ylöspäin → enemmän ilmaa
-  vy = Math.max(0, -mouse.y * 2.4);
-
-  puck.position.y = 2;
-}/////////////////////////////////////////////////////
-// PASS (WORKING SIMPLE)
-/////////////////////////////////////////////////////
+addEventListener("mousedown",shoot);
 
 function pass(){
-  const t = controlled==="user"?teammate:user;
+  if(!hasPuck()) return;
+
+  const t=controlled==="user"?team:user;
 
   let dx=t.position.x-active().position.x;
   let dz=t.position.z-active().position.z;
@@ -221,71 +129,48 @@ function pass(){
 
   vx=(dx/len)*2.5;
   vz=(dz/len)*2.5;
+  vy=0;
+
+  controlled=controlled==="user"?"team":"user";
 }
 
 addEventListener("keydown",e=>{
   if(e.code==="Space") pass();
 });
 
-/////////////////////////////////////////////////////
-// PHYSICS
-/////////////////////////////////////////////////////
-
 function physics(){
-
   puck.position.x+=vx;
   puck.position.z+=vz;
+  puck.position.y+=vy;
+
+  vy-=0.1;
+
+  if(puck.position.y<1){
+    puck.position.y=1;
+    vy=0;
+  }
 
   vx*=0.96;
   vz*=0.96;
-
-  if(puck.position.y>1){
-    puck.position.y*=0.95;
-  } else {
-    puck.position.y=1;
-  }
 }
 
-/////////////////////////////////////////////////////
-// GOAL CHECK
-/////////////////////////////////////////////////////
-
-function goal(){
-
-  if(puck.position.z<-40 && Math.abs(puck.position.x)<6){
-    score++;
-    document.getElementById("hud").innerText="0 - "+score;
-    puck.position.set(0,1,0);
-    vx=vz=0;
-  }
+function ai(){
+  ai1.position.x+=(puck.position.x-ai1.position.x)*0.03;
+  ai2.position.x+=(puck.position.x-ai2.position.x)*0.03;
 }
 
-/////////////////////////////////////////////////////
-// CAMERA (STABLE)
-/////////////////////////////////////////////////////
-
-function cameraFix(){
-  const p=active();
-
-  camera.position.x+=(p.position.x-camera.position.x)*0.08;
-  camera.position.z+=(p.position.z+25-camera.position.z)*0.08;
-
-  camera.lookAt(p.position.x,0,p.position.z-10);
-}
-
-/////////////////////////////////////////////////////
-// LOOP
-/////////////////////////////////////////////////////
-ai.position.x += (puck.position.x - ai.position.x) * 0.03;
-defender.position.x += (puck.position.x - defender.position.x) * 0.03;
-  function loop(){
+function loop(){
   requestAnimationFrame(loop);
 
   move();
   pickup();
   physics();
-  goal();
-  cameraFix();
+  ai();
+
+  const p=active();
+  camera.position.x+=(p.position.x-camera.position.x)*0.08;
+  camera.position.z+=(p.position.z+25-camera.position.z)*0.08;
+  camera.lookAt(p.position.x,0,p.position.z-10);
 
   renderer.render(scene,camera);
 }
