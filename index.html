@@ -46,6 +46,26 @@ const ice = new THREE.Mesh(
 ice.rotation.x = -Math.PI/2;
 scene.add(ice);
 
+  function makeBoards(){
+
+  const mat = new THREE.MeshStandardMaterial({color:0xffffff});
+
+  const left = new THREE.Mesh(new THREE.BoxGeometry(2,3,120),mat);
+  const right = new THREE.Mesh(new THREE.BoxGeometry(2,3,120),mat);
+
+  const top = new THREE.Mesh(new THREE.BoxGeometry(200,3,2),mat);
+  const bottom = new THREE.Mesh(new THREE.BoxGeometry(200,3,2),mat);
+
+  left.position.set(-100,1.5,0);
+  right.position.set(100,1.5,0);
+
+  top.position.set(0,1.5,-60);
+  bottom.position.set(0,1.5,60);
+
+  scene.add(left,right,top,bottom);
+}
+
+makeBoards();
 /////////////////////////////////////////////////////
 // 🥅 GOAL
 /////////////////////////////////////////////////////
@@ -321,8 +341,30 @@ function block(p){
 /////////////////////////////////////////////////////
 
 function physics(){
+function checkBoards(){
 
-  puck.position.x+=vx;
+  // vasen / oikea
+  if(puck.position.x < -98){
+    puck.position.x = -98;
+    vx *= -0.6;
+  }
+
+  if(puck.position.x > 98){
+    puck.position.x = 98;
+    vx *= -0.6;
+  }
+
+  // ylä / ala
+  if(puck.position.z < -58){
+    puck.position.z = -58;
+    vz *= -0.6;
+  }
+
+  if(puck.position.z > 58){
+    puck.position.z = 58;
+    vz *= -0.6;
+  }
+}  puck.position.x+=vx;
   puck.position.z+=vz;
   puck.position.y+=vy;
 
@@ -381,7 +423,7 @@ function loop(){
   physics();
   ai();
   cam();
-
+  checkBoards();  
   renderer.render(scene,camera);
 }
 
