@@ -243,20 +243,36 @@ function goalieSave(){
 // ===== GOALIE AI =====
 function goalieAI(){
 
-  // 🧠 reagoi vain kun kiekko hyökkäysalueella
+  // reagoi vain hyökkäysalueella
   if(puck.position.z > -20) return;
 
-  // 🎯 ennakointi mutta hillitty
-  let predict = puck.position.x + vx * 6;
+  // 🥅 maalin keskipiste
+  const goalX = 0;
+  const goalZ = -40;
 
-  // 🥅 rajoitus tolppien väliin
-  predict = Math.max(-6, Math.min(6, predict));
+  // 🧠 suunta kiekolta maaliin
+  let dx = puck.position.x - goalX;
+  let dz = puck.position.z - goalZ;
 
-  // 🧊 liike (ei karkaa)
-  goalie.position.x += (predict - goalie.position.x) * 0.08;
+  let len = Math.sqrt(dx*dx + dz*dz);
+  if(len < 0.001) return;
 
-  // 🔒 lukitaan maaliviivalle
-  goalie.position.z = -38;
+  dx /= len;
+  dz /= len;
+
+  // 🎯 aggressiivisuus (kuinka ulos tulee)
+  const depth = 6; // pienempi = syvemmällä maalissa
+
+  // 📍 maalivahdin target sijainti
+  let targetX = goalX + dx * depth;
+  let targetZ = goalZ + dz * depth;
+
+  // 🥅 rajoita tolppien väliin
+  targetX = Math.max(-6, Math.min(6, targetX));
+
+  // 🧊 smooth liike
+  goalie.position.x += (targetX - goalie.position.x) * 0.12;
+  goalie.position.z += (targetZ - goalie.position.z) * 0.12;
 }
 // ===== AI ENEMIES =====
 function ai(){
