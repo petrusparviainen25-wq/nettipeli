@@ -2,11 +2,18 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL SAFE V6</title>
+<title>NHL SAFE V7</title>
 <style>
 body { margin:0; overflow:hidden; background:#87cfff; }
 canvas { display:block; }
-#score{position:absolute;top:10px;left:10px;color:white;font-family:Arial;font-size:22px;}
+#score{
+ position:absolute;
+ top:10px;
+ left:10px;
+ color:white;
+ font-family:Arial;
+ font-size:22px;
+}
 </style>
 </head>
 <body>
@@ -18,49 +25,77 @@ canvas { display:block; }
 <script>
 
 /////////////////////////////////////////////////////
-// 🌍 SAFE WORLD
+// 🧠 SAFE STATE
 /////////////////////////////////////////////////////
 
 let scene, camera, renderer;
 
-try{
+let puck, user, team, ai1, ai2, goalie;
 
-scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87cfff);
+let vx=0,vz=0,vy=0;
+let velX=0,velZ=0;
 
-camera = new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.1,1000);
-camera.position.set(0,25,60);
+let mouse={x:0,y:0};
+let keys={};
+let controlled="user";
 
-renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(innerWidth,innerHeight);
-document.body.appendChild(renderer.domElement);
+let goalieDelay=0;
+let goalieTargetX=0;
 
-scene.add(new THREE.AmbientLight(0xffffff,1.2));
-const light = new THREE.DirectionalLight(0xffffff,1.5);
-light.position.set(10,30,10);
-scene.add(light);
+let passTimer=0;
+let score=0;
 
-}catch(e){
-console.log("INIT ERROR",e);
+/////////////////////////////////////////////////////
+// 🧱 INIT (IMPORTANT FIX)
+/////////////////////////////////////////////////////
+
+function init(){
+
+ scene = new THREE.Scene();
+ scene.background = new THREE.Color(0x87cfff);
+
+ camera = new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.1,1000);
+ camera.position.set(0,25,60);
+
+ renderer = new THREE.WebGLRenderer({antialias:true});
+ renderer.setSize(innerWidth,innerHeight);
+ document.body.appendChild(renderer.domElement);
+
+ const light = new THREE.AmbientLight(0xffffff,1.2);
+ scene.add(light);
+
+ const dir = new THREE.DirectionalLight(0xffffff,1.3);
+ dir.position.set(10,30,10);
+ scene.add(dir);
+
+ createIce();
+ createBoards();
+ createGoal();
+ createPlayers();
+ createPuck();
+
 }
 
 /////////////////////////////////////////////////////
 // 🧊 ICE
 /////////////////////////////////////////////////////
 
-const ice = new THREE.Mesh(
- new THREE.PlaneGeometry(200,120),
- new THREE.MeshStandardMaterial({color:0xdff6ff})
-);
-ice.rotation.x=-Math.PI/2;
-scene.add(ice);
+function createIce(){
+ const ice = new THREE.Mesh(
+  new THREE.PlaneGeometry(200,120),
+  new THREE.MeshStandardMaterial({color:0xdff6ff})
+ );
+ ice.rotation.x = -Math.PI/2;
+ scene.add(ice);
+}
 
 /////////////////////////////////////////////////////
-// 🧱 BOARDS SAFE
+// 🧱 BOARDS
 /////////////////////////////////////////////////////
 
-function boards(){
- const m=new THREE.MeshStandardMaterial({color:0xffffff});
+function createBoards(){
+
+ const m = new THREE.MeshStandardMaterial({color:0xffffff});
 
  const a=new THREE.Mesh(new THREE.BoxGeometry(2,3,120),m);
  const b=new THREE.Mesh(new THREE.BoxGeometry(2,3,120),m);
@@ -74,14 +109,13 @@ function boards(){
 
  scene.add(a,b,c,d);
 }
-boards();
 
 /////////////////////////////////////////////////////
 // 🥅 GOAL
 /////////////////////////////////////////////////////
 
-function goal(){
- const g=new THREE.Group();
+function createGoal(){
+
  const m=new THREE.MeshStandardMaterial({color:0xff0000});
 
  const l=new THREE.Mesh(new THREE.BoxGeometry(0.5,10,0.5),m);
@@ -92,74 +126,47 @@ function goal(){
  r.position.set(7,5,-40);
  t.position.set(0,10,-40);
 
- g.add(l,r,t);
- scene.add(g);
+ scene.add(l,r,t);
 }
-goal();
 
 /////////////////////////////////////////////////////
-// 🧍 PLAYERS SAFE
+// 🧍 PLAYERS
 /////////////////////////////////////////////////////
 
-function player(c,x,z){
+function player(color,x,z){
  const p=new THREE.Mesh(
   new THREE.CapsuleGeometry(1.2,2,6,10),
-  new THREE.MeshStandardMaterial({color:c})
+  new THREE.MeshStandardMaterial({color})
  );
  p.position.set(x,2,z);
  scene.add(p);
  return p;
 }
 
-const user=player(0x0066ff,0,30);
-const team=player(0x3399ff,6,30);
-
-const ai1=player(0xff4444,-5,-20);
-const ai2=player(0xff7777,5,-25);
-
-/////////////////////////////////////////////////////
-// 🥅 GOALIE SAFE
-/////////////////////////////////////////////////////
-
-const goalie=new THREE.Mesh(
- new THREE.CapsuleGeometry(1.6,2.5,6,10),
- new THREE.MeshStandardMaterial({color:0xffffff})
-);
-goalie.position.set(0,2,-38);
-scene.add(goalie);
+function createPlayers(){
+ user = player(0x0066ff,0,30);
+ team = player(0x3399ff,6,30);
+ ai1 = player(0xff4444,-5,-20);
+ ai2 = player(0xff7777,5,-25);
+ goalie = player(0xffffff,0,-38);
+}
 
 /////////////////////////////////////////////////////
-// 🏒 PUCK SAFE
+// 🏒 PUCK
 /////////////////////////////////////////////////////
 
-const puck=new THREE.Mesh(
- new THREE.CylinderGeometry(1,1,0.5,16),
- new THREE.MeshStandardMaterial({color:0x000000})
-);
-puck.rotation.x=Math.PI/2;
-puck.position.set(0,1,0);
-scene.add(puck);
+function createPuck(){
+ puck = new THREE.Mesh(
+  new THREE.CylinderGeometry(1,1,0.5,16),
+  new THREE.MeshStandardMaterial({color:0x000000})
+ );
+ puck.rotation.x=Math.PI/2;
+ puck.position.set(0,1,0);
+ scene.add(puck);
+}
 
 /////////////////////////////////////////////////////
-// 🧠 SAFE STATE
-/////////////////////////////////////////////////////
-
-let vx=0,vz=0,vy=0;
-let velX=0,velZ=0;
-
-let mouse={x:0,y:0};
-let keys={};
-let controlled="user";
-
-let goalieDelay=0;
-let goalieTargetX=0;
-
-let passTimer=0;
-
-let score=0;
-
-/////////////////////////////////////////////////////
-// INPUT SAFE
+// INPUT
 /////////////////////////////////////////////////////
 
 addEventListener("keydown",e=>keys[e.code]=true);
@@ -171,7 +178,7 @@ addEventListener("mousemove",e=>{
 });
 
 /////////////////////////////////////////////////////
-// ACTIVE SAFE
+// ACTIVE
 /////////////////////////////////////////////////////
 
 function active(){
@@ -179,10 +186,11 @@ function active(){
 }
 
 /////////////////////////////////////////////////////
-// MOVE SAFE
+// MOVE
 /////////////////////////////////////////////////////
 
 function move(){
+
  const p=active();
 
  let acc=0.15;
@@ -200,17 +208,16 @@ function move(){
 }
 
 /////////////////////////////////////////////////////
-// PUCK SAFE
+// PUCK CONTROL
 /////////////////////////////////////////////////////
 
 function hasPuck(){
  const p=active();
- let dx=puck.position.x-p.position.x;
- let dz=puck.position.z-p.position.z;
- return Math.sqrt(dx*dx+dz*dz)<3;
+ return Math.hypot(puck.position.x-p.position.x,puck.position.z-p.position.z)<3;
 }
 
 function pickup(){
+
  if(!hasPuck()) return;
 
  const p=active();
@@ -218,7 +225,7 @@ function pickup(){
  let dx=velX;
  let dz=velZ;
 
- let len=Math.sqrt(dx*dx+dz*dz);
+ let len=Math.hypot(dx,dz);
  if(len<0.01){dx=0;dz=-1;len=1;}
 
  dx/=len;
@@ -230,7 +237,7 @@ function pickup(){
 }
 
 /////////////////////////////////////////////////////
-// SHOOT SAFE
+// SHOOT
 /////////////////////////////////////////////////////
 
 addEventListener("mousedown",()=>{
@@ -240,7 +247,7 @@ addEventListener("mousedown",()=>{
  let dx=mouse.x;
  let dz=mouse.y;
 
- let len=Math.sqrt(dx*dx+dz*dz);
+ let len=Math.hypot(dx,dz);
  if(len<0.001){dx=0;dz=-1;len=1;}
 
  dx/=len;
@@ -256,12 +263,11 @@ addEventListener("mousedown",()=>{
 
  vx=dx*5;
  vz=dz*5;
-
  vy=Math.max(0,-mouse.y)*2;
 });
 
 /////////////////////////////////////////////////////
-// PASS SAFE
+// PASS
 /////////////////////////////////////////////////////
 
 function pass(){
@@ -273,7 +279,7 @@ function pass(){
  let dx=t.position.x-active().position.x;
  let dz=t.position.z-active().position.z;
 
- let len=Math.sqrt(dx*dx+dz*dz);
+ let len=Math.hypot(dx,dz);
  if(len<0.001) return;
 
  dx/=len;
@@ -283,7 +289,7 @@ function pass(){
  vz=dz*3.5;
  vy=0;
 
- passTimer=12; // one-timer window
+ passTimer=12;
 
  controlled=controlled==="user"?"team":"user";
 }
@@ -293,7 +299,7 @@ addEventListener("keydown",e=>{
 });
 
 /////////////////////////////////////////////////////
-// 🥅 GOALIE SAFE AI
+// GOALIE AI SAFE
 /////////////////////////////////////////////////////
 
 function goalieAI(){
@@ -302,30 +308,21 @@ function goalieAI(){
 
  if(goalieDelay<=0){
 
-  const goalX=0;
-  const goalZ=-40;
+  const dx=puck.position.x;
+  const len=Math.hypot(dx,1);
 
-  let dx=puck.position.x-goalX;
-  let dz=puck.position.z-goalZ;
+  goalieTargetX=(dx/len)*6;
 
-  let len=Math.sqrt(dx*dx+dz*dz);
-  if(len<0.001) return;
-
-  dx/=len;
-  dz/=len;
-
-  goalieTargetX=dx*6;
   goalieDelay=10+Math.random()*10;
  }
 
  goalieDelay--;
 
  goalie.position.x+=(goalieTargetX-goalie.position.x)*0.12;
- goalie.position.z=-38;
 }
 
 /////////////////////////////////////////////////////
-// 🧤 SAVE SAFE
+// SAVE
 /////////////////////////////////////////////////////
 
 function save(){
@@ -333,19 +330,17 @@ function save(){
  let dx=puck.position.x-goalie.position.x;
  let dz=puck.position.z-goalie.position.z;
 
- let d=Math.sqrt(dx*dx+dz*dz);
+ let d=Math.hypot(dx,dz);
 
  if(puck.position.z<-34 && d<3){
-
   vx*=-0.4;
   vz*=0.3;
-
   vy=1;
  }
 }
 
 /////////////////////////////////////////////////////
-// 🤖 AI SAFE
+// AI
 /////////////////////////////////////////////////////
 
 function ai(){
@@ -353,15 +348,13 @@ function ai(){
  ai1.position.x+=(puck.position.x-ai1.position.x)*0.04;
  ai2.position.x+=(puck.position.x-ai2.position.x)*0.04;
 
- let d1=Math.hypot(puck.position.x-ai1.position.x,puck.position.z-ai1.position.z);
- let d2=Math.hypot(puck.position.x-ai2.position.x,puck.position.z-ai2.position.z);
-
- if(d1<2){vx*=0.5;vz*=0.5;}
- if(d2<2){vx*=0.5;vz*=0.5;}
+ if(Math.hypot(puck.position.x-ai1.position.x,puck.position.z-ai1.position.z)<2){
+  vx*=0.5;
+ }
 }
 
 /////////////////////////////////////////////////////
-// WALL SAFE
+// WALL
 /////////////////////////////////////////////////////
 
 function wall(){
@@ -373,7 +366,7 @@ function wall(){
 }
 
 /////////////////////////////////////////////////////
-// GOAL SAFE
+// GOAL
 /////////////////////////////////////////////////////
 
 function goal(){
@@ -391,7 +384,7 @@ function goal(){
 }
 
 /////////////////////////////////////////////////////
-// PHYSICS SAFE
+// PHYSICS
 /////////////////////////////////////////////////////
 
 function physics(){
@@ -424,6 +417,7 @@ function physics(){
 /////////////////////////////////////////////////////
 
 function cam(){
+
  const p=active();
 
  camera.position.x+=(p.position.x-camera.position.x)*0.08;
@@ -433,20 +427,26 @@ function cam(){
 }
 
 /////////////////////////////////////////////////////
-// LOOP SAFE
+// LOOP SAFE (NO CRASH)
 /////////////////////////////////////////////////////
 
 function loop(){
+
  requestAnimationFrame(loop);
 
- move();
- pickup();
- physics();
- cam();
+ try{
+  move();
+  pickup();
+  physics();
+  cam();
+ }catch(e){
+  console.log("runtime error",e);
+ }
 
  renderer.render(scene,camera);
 }
 
+init();
 loop();
 
 </script>
