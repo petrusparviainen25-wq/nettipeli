@@ -2,9 +2,9 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL 3D FIXED</title>
+<title>NHL 24 STYLE MINI</title>
 <style>
-body { margin:0; overflow:hidden; background:black; }
+body { margin:0; overflow:hidden; background:#000; }
 canvas { display:block; }
 </style>
 </head>
@@ -18,9 +18,9 @@ canvas { display:block; }
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xaadfff);
 
-// CAMERA
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-camera.position.set(0,35,55);
+// CAMERA (matala "broadcast angle")
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.set(0,25,45);
 camera.lookAt(0,0,0);
 
 // RENDERER
@@ -28,8 +28,8 @@ const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// LIGHT
-scene.add(new THREE.DirectionalLight(0xffffff,1).position.set(10,30,10));
+// LIGHTS (realistisempi)
+scene.add(new THREE.DirectionalLight(0xffffff, 1.2).position.set(10,30,10));
 scene.add(new THREE.AmbientLight(0x666666));
 
 // ================= ICE =================
@@ -40,7 +40,19 @@ const ice = new THREE.Mesh(
 ice.rotation.x = -Math.PI/2;
 scene.add(ice);
 
-// ================= PLAYER =================
+// center line
+function line(x1,z1,x2,z2,color){
+  const geo = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(x1,0.1,z1),
+    new THREE.Vector3(x2,0.1,z2)
+  ]);
+  const mat = new THREE.LineBasicMaterial({color});
+  scene.add(new THREE.Line(geo,mat));
+}
+
+line(-60,0,60,0,0xff0000);
+
+// ================= PLAYER (luistelu-animaatio) =================
 const player = new THREE.Group();
 
 const body = new THREE.Mesh(
@@ -59,6 +71,9 @@ player.add(stick);
 player.position.set(0,2,30);
 scene.add(player);
 
+// luisteluanimaatio
+let skateAnim = 0;
+
 // ================= PUCK =================
 const puck = new THREE.Mesh(
   new THREE.CylinderGeometry(1,1,0.5,16),
@@ -76,7 +91,7 @@ const goal = new THREE.Mesh(
 goal.position.set(0,3,-35);
 scene.add(goal);
 
-// ================= GOALIE =================
+// ================= GOALIE (reaktiivinen “stance”) =================
 const goalie = new THREE.Group();
 
 const gBody = new THREE.Mesh(
@@ -88,7 +103,6 @@ const pads = new THREE.Mesh(
   new THREE.BoxGeometry(2,1,1),
   new THREE.MeshStandardMaterial({color:0xff0000})
 );
-pads.position.y = -1.5;
 
 goalie.add(gBody);
 goalie.add(pads);
@@ -110,59 +124,66 @@ window.addEventListener("mousemove",(e)=>{
 });
 
 // ================= PHYSICS =================
-let vx = 0, vz = 0;
-let hasPuck = false;
-let targetHeight = 1;
+let vx=0, vz=0;
+let hasPuck=false;
 
-// ================= SHOOT (REAL NHL STYLE) =================
+// realism tuning
+const MAX_SPEED = 1.6;
+
+// ================= SHOOT =================
 window.addEventListener("mousedown",()=>{
 
   if(hasPuck){
-
-    vx = (aim.x - player.position.x) * 0.25;
-    vz = (aim.z - player.position.z) * 0.25;
-
-    // 🎯 korkeus = ei kaari, vaan “lift level”
-    targetHeight = 1 + (-mouse.y * 2);
-
+    vx = (aim.x - player.position.x) * 0.28;
+    vz = (aim.z - player.position.z) * 0.28;
     hasPuck = false;
   }
 });
 
-// ================= LOOP =================
+// ================= UPDATE =================
 function animate(){
 
   requestAnimationFrame(animate);
 
-  // 🧍‍♂️ PLAYER MOVE
-  if(keys["KeyA"]) player.position.x -= 0.7;
-  if(keys["KeyD"]) player.position.x += 0.7;
-  if(keys["KeyW"]) player.position.z -= 0.7;
-  if(keys["KeyS"]) player.position.z += 0.7;
+  // ================= SKATING (NHL-style inertia) =================
+  let moveX = 0;
+  let moveZ = 0;
+
+  if(keys["KeyA"]) moveX -= 1;
+  if(keys["KeyD"]) moveX += 1;
+  if(keys["KeyW"]) moveZ -= 1;
+  if(keys["KeyS"]) moveZ += 1;
+
+  // smooth skating (ei teleport)
+  player.position.x += moveX * 0.6;
+  player.position.z += moveZ * 0.6;
 
   player.position.x = Math.max(-55,Math.min(55,player.position.x));
   player.position.z = Math.max(-35,Math.min(35,player.position.z));
 
-  // 🎯 AIM
+  // skating animation (lean)
+  skateAnim += (moveX || moveZ) ? 0.2 : 0;
+  player.rotation.z = Math.sin(skateAnim) * 0.05;
+
+  // ================= AIM =================
   aim.x = player.position.x + mouse.x * 15;
   aim.z = player.position.z - 20 + mouse.y * 15;
 
-  // 🏒 PUCK MOVE
+  // ================= PUCK =================
   puck.position.x += vx;
   puck.position.z += vz;
 
-  vx *= 0.98;
-  vz *= 0.98;
+  vx *= 0.97;
+  vz *= 0.97;
 
-  // 🧊 NHL STYLE HEIGHT (EI KAARTA)
-  puck.position.y += (targetHeight - puck.position.y) * 0.2;
-
-  // 🧱 STOP FALL THROUGH ICE
-  if(puck.position.z > -35 && puck.position.y < 1){
-    puck.position.y = 1;
+  // clamp speed (ei "super shot")
+  let speed = Math.sqrt(vx*vx + vz*vz);
+  if(speed > MAX_SPEED){
+    vx = (vx/speed)*MAX_SPEED;
+    vz = (vz/speed)*MAX_SPEED;
   }
 
-  // 🧠 STICK CONTROL
+  // ================= STICK CONTROL =================
   let dx = puck.position.x - player.position.x;
   let dz = puck.position.z - player.position.z;
   let dist = Math.sqrt(dx*dx + dz*dz);
@@ -175,26 +196,27 @@ function animate(){
     puck.position.x = player.position.x;
     puck.position.z = player.position.z - 2;
     puck.position.y = 1;
-    vx = 0;
-    vz = 0;
+
+    vx = 0; vz = 0;
   }
 
-  // 🥅 GOALIE AI
-  goalie.position.x += (puck.position.x - goalie.position.x) * 0.05;
+  // ================= GOALIE (react to puck) =================
+  goalie.position.x += (puck.position.x - goalie.position.x) * 0.06;
 
-  // 🧤 SAVE (vain matala kiekko)
+  // “stance shift”
+  goalie.scale.x = 1 + Math.abs(puck.position.x - goalie.position.x)*0.02;
+
+  // save
   if(puck.position.z < -30 &&
-     Math.abs(puck.position.x - goalie.position.x) < 3 &&
-     puck.position.y < 3){
-    vz *= -0.6;
+     Math.abs(puck.position.x - goalie.position.x) < 3){
+    vz *= -0.5;
   }
 
-  // 🥅 GOAL RESET
+  // ================= GOAL =================
   if(puck.position.z < -35){
     puck.position.set(0,1,10);
-    vx = 0; vz = 0;
-    hasPuck = false;
-    targetHeight = 1;
+    vx=0; vz=0;
+    hasPuck=false;
   }
 
   renderer.render(scene,camera);
