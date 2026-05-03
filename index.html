@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL SAFE FULL (NO WHITE SCREEN)</title>
+<title>NHL SAFE V2 FINAL</title>
 <style>
 body { margin:0; overflow:hidden; }
 canvas { display:block; }
@@ -14,7 +14,7 @@ canvas { display:block; }
 
 <script>
 
-// ===== SCENE =====
+// ===== WORLD =====
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87cfff);
 
@@ -40,13 +40,13 @@ ice.rotation.x = -Math.PI/2;
 scene.add(ice);
 
 // ===== BOARDS =====
-function makeBoards(){
-  const mat = new THREE.MeshStandardMaterial({color:0xffffff});
+function boardsMesh(){
+  const m = new THREE.MeshStandardMaterial({color:0xffffff});
 
-  const left = new THREE.Mesh(new THREE.BoxGeometry(2,3,120),mat);
-  const right = new THREE.Mesh(new THREE.BoxGeometry(2,3,120),mat);
-  const top = new THREE.Mesh(new THREE.BoxGeometry(200,3,2),mat);
-  const bottom = new THREE.Mesh(new THREE.BoxGeometry(200,3,2),mat);
+  const left = new THREE.Mesh(new THREE.BoxGeometry(2,3,120),m);
+  const right = new THREE.Mesh(new THREE.BoxGeometry(2,3,120),m);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(200,3,2),m);
+  const bottom = new THREE.Mesh(new THREE.BoxGeometry(200,3,2),m);
 
   left.position.set(-100,1.5,0);
   right.position.set(100,1.5,0);
@@ -55,10 +55,10 @@ function makeBoards(){
 
   scene.add(left,right,top,bottom);
 }
-makeBoards();
+boardsMesh();
 
 // ===== GOAL =====
-function makeGoal(){
+function goal(){
   const g=new THREE.Group();
   const m=new THREE.MeshStandardMaterial({color:0xff0000});
 
@@ -73,7 +73,7 @@ function makeGoal(){
   g.add(l,r,t);
   scene.add(g);
 }
-makeGoal();
+goal();
 
 // ===== PLAYERS =====
 function player(c,x,z){
@@ -114,6 +114,7 @@ let mouse={x:0,y:0};
 let keys={};
 let controlled="user";
 let pressTime=0;
+let stamina=100;
 
 // ===== INPUT =====
 addEventListener("keydown",e=>keys[e.code]=true);
@@ -140,7 +141,7 @@ function move(){
   if(keys["KeyS"])p.position.z+=0.8;
 }
 
-// ===== PUCK PICKUP =====
+// ===== PUCK =====
 function hasPuck(){
   const p=active();
   let dx=puck.position.x-p.position.x;
@@ -153,11 +154,11 @@ function pickup(){
   const p=active();
   puck.position.x=p.position.x;
   puck.position.z=p.position.z-2;
-  puck.position.y=1;
 }
 
-// ===== SHOOT =====
+// ===== SHOOT SYSTEM =====
 addEventListener("mouseup",()=>{
+
   if(!hasPuck()) return;
 
   let dx=mouse.x;
@@ -166,11 +167,21 @@ addEventListener("mouseup",()=>{
   let len=Math.sqrt(dx*dx+dz*dz);
   if(len===0){dx=0;dz=-1;len=1;}
 
-  vx=(dx/len)*4.5;
-  vz=(dz/len)*4.5;
+  const hold=Math.min(1,(Date.now()-pressTime)/800);
+
+  let power=3.5;
+  if(hold>0.7) power=7;        // slap
+  else if(hold>0.3) power=5;   // snap
+
+  const staminaFactor=0.5+(stamina/100)*0.8;
+
+  vx=(dx/len)*power*staminaFactor;
+  vz=(dz/len)*power*staminaFactor;
+
   vy=0;
 
-  puck.position.y=1;
+  stamina-=hold>0.7?15:8;
+  stamina=Math.max(0,stamina);
 });
 
 // ===== PASS =====
@@ -190,18 +201,37 @@ addEventListener("keydown",e=>{
   }
 });
 
-// ===== BOARDS COLLISION =====
-function boards(){
-  if(puck.position.x < -98){puck.position.x=-98;vx*=-0.6;}
-  if(puck.position.x > 98){puck.position.x=98;vx*=-0.6;}
-  if(puck.position.z < -58){puck.position.z=-58;vz*=-0.6;}
-  if(puck.position.z > 58){puck.position.z=58;vz*=-0.6;}
+// ===== BOARDS =====
+function boardPhysics(){
+  if(puck.position.x<-98){puck.position.x=-98;vx*=-0.6;}
+  if(puck.position.x>98){puck.position.x=98;vx*=-0.6;}
+  if(puck.position.z<-58){puck.position.z=-58;vz*=-0.6;}
+  if(puck.position.z>58){puck.position.z=58;vz*=-0.6;}
 }
 
-// ===== GOALIE =====
+// ===== GOALIE AI =====
 function goalieAI(){
-  const target = puck.position.x + vx*10;
-  goalie.position.x += (target - goalie.position.x)*0.08;
+  const target = puck.position.x + vx*8;
+  goalie.position.x += (target-goalie.position.x)*0.08;
+}
+
+// ===== SAVE + REBOUND =====
+function goalieSave(){
+
+  let dx=puck.position.x-goalie.position.x;
+  let dz=puck.position.z-goalie.position.z;
+
+  let d=Math.sqrt(dx*dx+dz*dz);
+
+  if(puck.position.z<-34 && d<3){
+
+    vx*=-0.4;
+    vz*=0.3;
+
+    // rebound (hallittu, ei bugi)
+    vy = 1.5;
+
+  }
 }
 
 // ===== PHYSICS =====
@@ -209,19 +239,33 @@ function physics(){
 
   puck.position.x+=vx;
   puck.position.z+=vz;
+  puck.position.y+=vy;
+
+  vy-=0.08;
+
+  if(puck.position.y<1){
+    puck.position.y=1;
+    vy=0;
+  }
 
   vx*=0.96;
   vz*=0.96;
 
-  boards();
+  boardPhysics();
   goalieAI();
+  goalieSave();
+
+  stamina+=0.1;
+  stamina=Math.min(100,stamina);
 }
 
 // ===== CAMERA =====
 function cam(){
   const p=active();
+
   camera.position.x+=(p.position.x-camera.position.x)*0.08;
   camera.position.z+=(p.position.z+25-camera.position.z)*0.08;
+
   camera.lookAt(p.position.x,0,p.position.z-10);
 }
 
