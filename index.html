@@ -168,12 +168,29 @@ function hasPuck(){
 }
 
 function pickup(){
- if(!hasPuck()) return;
- const p=active();
- puck.position.x=p.position.x;
- puck.position.z=p.position.z-2;
-}
 
+  if(!hasPuck()) return;
+
+  const p = active();
+
+  let dirX = velX;
+  let dirZ = velZ;
+
+  let len = Math.sqrt(dirX*dirX + dirZ*dirZ);
+
+  if(len < 0.01){
+    dirX = 0;
+    dirZ = -1;
+    len = 1;
+  }
+
+  dirX /= len;
+  dirZ /= len;
+
+  puck.position.x = p.position.x + dirX * 2;
+  puck.position.z = p.position.z + dirZ * 2;
+  puck.position.y = 1;
+}
 // ===== SHOOT (HIGH SAFE) =====
 addEventListener("mousedown",()=>{
  if(!hasPuck()) return;
