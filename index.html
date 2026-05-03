@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL ULTIMATE ENGINE</title>
+<title>NHL CONSOLE ENGINE</title>
 <style>
 body { margin:0; overflow:hidden; background:#000; }
 canvas { display:block; }
@@ -16,12 +16,11 @@ canvas { display:block; }
   font-size:18px;
 }
 
-#goal {
+#msg {
   position:absolute;
   top:50px;
   left:10px;
   color:yellow;
-  font-family:Arial;
   font-size:22px;
 }
 </style>
@@ -29,14 +28,14 @@ canvas { display:block; }
 <body>
 
 <div id="hud">SINÄ 0 - 0 AI</div>
-<div id="goal"></div>
+<div id="msg"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
 <script>
 
 //////////////////////////////
-// 🌍 WORLD
+// 🌍 WORLD + ENGINE CORE
 //////////////////////////////
 
 const scene = new THREE.Scene();
@@ -44,12 +43,12 @@ scene.background = new THREE.Color(0x9fd3ff);
 
 scene.add(new THREE.AmbientLight(0xffffff,0.7));
 
-const sun = new THREE.DirectionalLight(0xffffff,1.5);
-sun.position.set(10,30,10);
-scene.add(sun);
+const light = new THREE.DirectionalLight(0xffffff,1.5);
+light.position.set(10,30,10);
+scene.add(light);
 
 //////////////////////////////
-// 🎥 CAMERA (TV STYLE)
+// 🎥 CONSOLE CAMERA FEEL
 //////////////////////////////
 
 const camera = new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.1,1000);
@@ -64,25 +63,25 @@ renderer.setSize(innerWidth,innerHeight);
 document.body.appendChild(renderer.domElement);
 
 //////////////////////////////
-// 🧊 ICE (real feel)
+// 🧊 ICE (console polish)
 //////////////////////////////
 
 const ice = new THREE.Mesh(
   new THREE.PlaneGeometry(180,110),
   new THREE.MeshStandardMaterial({
     color:0xdff6ff,
-    roughness:0.06,
-    metalness:0.15
+    roughness:0.05,
+    metalness:0.2
   })
 );
 ice.rotation.x = -Math.PI/2;
 scene.add(ice);
 
 //////////////////////////////
-// 🏒 OBJECTS
+// 🏒 ENTITIES
 //////////////////////////////
 
-function player(color,z){
+function makePlayer(color,z){
   const p = new THREE.Mesh(
     new THREE.CapsuleGeometry(1.2,2,4,8),
     new THREE.MeshStandardMaterial({color})
@@ -92,8 +91,8 @@ function player(color,z){
   return p;
 }
 
-const user = player(0x0066ff,35);
-const bot = player(0xff3333,-35);
+const player = makePlayer(0x0066ff,35);
+const ai = makePlayer(0xff3333,-35);
 
 const goalie = new THREE.Mesh(
   new THREE.CapsuleGeometry(1.5,2.5,4,8),
@@ -110,7 +109,7 @@ puck.rotation.x = Math.PI/2;
 scene.add(puck);
 
 //////////////////////////////
-// 🎮 INPUT
+// 🎮 INPUT SYSTEM
 //////////////////////////////
 
 let keys = {};
@@ -124,61 +123,68 @@ addEventListener("mousemove",e=>{
 });
 
 //////////////////////////////
-// 🧠 STATE
+// 🧠 GAME STATE (console style)
 //////////////////////////////
 
 let vx=0,vz=0;
 let hasPuck=false;
-
 let score=0;
 
 //////////////////////////////
-// 🏒 SHOOT SYSTEM (AAA feel)
+// 🏒 SHOOT SYSTEM (console feel)
 //////////////////////////////
 
 addEventListener("mousedown",()=>{
 
   if(!hasPuck) return;
 
-  const aimX = user.position.x + mouse.x*30;
-  const aimZ = user.position.z + mouse.y*30 - 15;
+  const aimX = player.position.x + mouse.x*30;
+  const aimZ = player.position.z + mouse.y*30 - 15;
 
-  vx = (aimX - user.position.x) * 0.28;
-  vz = (aimZ - user.position.z) * 0.28;
+  const power = 0.32;
 
-  hasPuck=false;
+  vx = (aimX - player.position.x) * power;
+  vz = (aimZ - player.position.z) * power;
+
+  hasPuck = false;
 });
 
 //////////////////////////////
-// 🤖 AI (intent-based)
+// 🤖 AI (role-based logic)
 //////////////////////////////
 
-function ai(){
+function aiLogic(){
 
-  let attack = puck.position.z < -5 ? 0.07 : -0.03;
+  let attackMode = puck.position.z < -5;
 
-  bot.position.x += (puck.position.x - bot.position.x)*0.06;
-  bot.position.z += attack;
+  let targetX = attackMode ? puck.position.x : 0;
 
-  bot.position.x = clamp(bot.position.x,-65,65);
-  bot.position.z = clamp(bot.position.z,-45,-5);
+  ai.position.x += (targetX - ai.position.x)*0.06;
+
+  ai.position.z += attackMode ? 0.06 : -0.03;
+
+  ai.position.x = clamp(ai.position.x,-65,65);
+  ai.position.z = clamp(ai.position.z,-45,-5);
 }
 
 //////////////////////////////
-// 🥅 GOALIE (reaction + angle)
+// 🥅 GOALIE (console AI)
 //////////////////////////////
 
-function goalieAI(){
+function goalieLogic(){
 
-  goalie.position.x += (puck.position.x - goalie.position.x)*0.1;
+  const target = puck.position.x;
+
+  goalie.position.x += (target - goalie.position.x)*0.11;
   goalie.position.x = clamp(goalie.position.x,-6,6);
+
   goalie.position.z = -38;
 }
 
-function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 
 //////////////////////////////
-// 🔁 RESET
+// 🔁 RESET SYSTEM
 //////////////////////////////
 
 function reset(){
@@ -186,50 +192,50 @@ function reset(){
   vx=0;vz=0;
   hasPuck=false;
 
-  user.position.set(0,2,35);
-  bot.position.set(0,2,-35);
+  player.position.set(0,2,35);
+  ai.position.set(0,2,-35);
   goalie.position.set(0,2,-38);
 }
 
 //////////////////////////////
-// 🎮 MAIN LOOP
+// 🎮 CONSOLE GAME LOOP (FIXED STEP FEEL)
 //////////////////////////////
 
 function loop(){
 
   requestAnimationFrame(loop);
 
-  //////////////////////////
-  // PLAYER MOVEMENT
-  //////////////////////////
+  ////////////////////////
+  // PLAYER ICE MOVEMENT
+  ////////////////////////
 
   let speed = 0.9;
 
-  if(keys["KeyA"]) user.position.x -= speed;
-  if(keys["KeyD"]) user.position.x += speed;
-  if(keys["KeyW"]) user.position.z -= speed;
-  if(keys["KeyS"]) user.position.z += speed;
+  if(keys["KeyA"]) player.position.x -= speed;
+  if(keys["KeyD"]) player.position.x += speed;
+  if(keys["KeyW"]) player.position.z -= speed;
+  if(keys["KeyS"]) player.position.z += speed;
 
-  user.position.x = clamp(user.position.x,-65,65);
-  user.position.z = clamp(user.position.z,-20,60);
+  player.position.x = clamp(player.position.x,-65,65);
+  player.position.z = clamp(player.position.z,-20,60);
 
-  //////////////////////////
-  // PUCK PICKUP
-  //////////////////////////
+  ////////////////////////
+  // PUCK PICKUP (NHL feel)
+  ////////////////////////
 
-  let dx = puck.position.x - user.position.x;
-  let dz = puck.position.z - user.position.z;
+  let dx = puck.position.x - player.position.x;
+  let dz = puck.position.z - player.position.z;
   let dist = Math.sqrt(dx*dx+dz*dz);
 
   if(dist < 3.5) hasPuck = true;
 
-  //////////////////////////
-  // PUCK PHYSICS
-  //////////////////////////
+  ////////////////////////
+  // PUCK PHYSICS (console tuned)
+  ////////////////////////
 
   if(hasPuck){
-    puck.position.x = user.position.x;
-    puck.position.z = user.position.z - 2;
+    puck.position.x = player.position.x;
+    puck.position.z = player.position.z - 2;
     puck.position.y = 1;
   } else {
     puck.position.x += vx;
@@ -239,48 +245,57 @@ function loop(){
     vz *= 0.965;
   }
 
-  //////////////////////////
+  ////////////////////////
   // AI + GOALIE
-  //////////////////////////
+  ////////////////////////
 
-  ai();
-  goalieAI();
+  aiLogic();
+  goalieLogic();
 
-  //////////////////////////
-  // SAVE SYSTEM
-  //////////////////////////
+  ////////////////////////
+  // SAVE SYSTEM (console reaction)
+  ////////////////////////
 
   if(puck.position.z < -37 &&
      Math.abs(puck.position.x - goalie.position.x) < 3){
     vx *= -0.55;
   }
 
-  //////////////////////////
-  // GOAL
-  //////////////////////////
+  ////////////////////////
+  // GOAL EVENT (console style)
+  ////////////////////////
 
   if(puck.position.z < -40){
+
     score++;
+
     document.getElementById("hud").innerText =
       "SINÄ " + score + " - AI 0";
 
-    document.getElementById("goal").innerText = "GOAL!";
-    setTimeout(()=>document.getElementById("goal").innerText="",800);
+    document.getElementById("msg").innerText = "GOAL!!!";
+
+    setTimeout(()=>{
+      document.getElementById("msg").innerText="";
+    },900);
 
     reset();
   }
 
-  //////////////////////////
-  // CAMERA (broadcast feel)
-  //////////////////////////
+  ////////////////////////
+  // CONSOLE CAMERA FEEL
+  ////////////////////////
 
-  camera.position.x += (user.position.x - camera.position.x)*0.04;
-  camera.lookAt(user.position.x,0,0);
+  camera.position.x += (player.position.x - camera.position.x)*0.04;
+  camera.lookAt(player.position.x,0,0);
 
   renderer.render(scene,camera);
 }
 
 loop();
+
+//////////////////////////////
+// 📏 RESIZE
+//////////////////////////////
 
 addEventListener("resize",()=>{
   camera.aspect=innerWidth/innerHeight;
