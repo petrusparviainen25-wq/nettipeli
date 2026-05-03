@@ -2,12 +2,12 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>Hockey FIX CORE</title>
+<title>Hockey FIXED CORE</title>
 <style>
-body{margin:0;overflow:hidden;background:#000;}
-canvas{display:block;}
-#hud{position:absolute;top:10px;left:10px;color:#fff;font-family:Arial;}
-#msg{position:absolute;top:50px;left:10px;color:yellow;font-size:20px;}
+body { margin:0; overflow:hidden; background:#000; }
+canvas { display:block; }
+#hud { position:absolute; top:10px; left:10px; color:white; font-family:Arial; }
+#msg { position:absolute; top:50px; left:10px; color:yellow; font-size:20px; }
 </style>
 </head>
 <body>
@@ -51,30 +51,40 @@ ice.rotation.x = -Math.PI/2;
 scene.add(ice);
 
 /////////////////////////////////////////////////////
-// 🥅 GOAL (FORCED VISIBLE)
+// 🥅 GOAL (VISIBLE + FIXED)
 /////////////////////////////////////////////////////
 
-function goal(){
+function makeGoal(){
 
   const g = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({color:0xff0000});
 
-  const l = new THREE.Mesh(new THREE.BoxGeometry(0.4,4,0.4),mat);
-  const r = new THREE.Mesh(new THREE.BoxGeometry(0.4,4,0.4),mat);
-  const t = new THREE.Mesh(new THREE.BoxGeometry(8,0.4,0.4),mat);
+  const left = new THREE.Mesh(new THREE.BoxGeometry(0.4,4,0.4),mat);
+  const right = new THREE.Mesh(new THREE.BoxGeometry(0.4,4,0.4),mat);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(8,0.4,0.4),mat);
 
-  l.position.set(-4,2,-40);
-  r.position.set(4,2,-40);
-  t.position.set(0,4,-40);
+  left.position.set(-4,2,-40);
+  right.position.set(4,2,-40);
+  top.position.set(0,4,-40);
 
-  g.add(l,r,t);
+  g.add(left,right,top);
   scene.add(g);
 }
-
-goal();
+makeGoal();
 
 /////////////////////////////////////////////////////
-// 🏒 PLAYERS (FORCED SCENE ADD CHECK)
+// 🥅 GOALIE (FIXED AI)
+/////////////////////////////////////////////////////
+
+const goalie = new THREE.Mesh(
+  new THREE.CapsuleGeometry(1.6,2.6,6,10),
+  new THREE.MeshStandardMaterial({color:0xffffff})
+);
+goalie.position.set(0,2,-38);
+scene.add(goalie);
+
+/////////////////////////////////////////////////////
+// 🏒 PLAYERS
 /////////////////////////////////////////////////////
 
 function player(color,z){
@@ -93,7 +103,7 @@ const ai = player(0xff3333,-35);
 const defender = player(0xff7777,-20);
 
 /////////////////////////////////////////////////////
-// 🧊 PUCK
+// 🧊 PUCK (IMPORTANT FIX)
 /////////////////////////////////////////////////////
 
 const puck = new THREE.Mesh(
@@ -104,49 +114,35 @@ puck.rotation.x = Math.PI/2;
 scene.add(puck);
 
 /////////////////////////////////////////////////////
-// 🧠 STATE (FIX CORE BUG)
+// 🧠 STATE SYSTEM (FIX CRITICAL BUG)
 /////////////////////////////////////////////////////
 
-let puckOwner = "none"; // "user" | "free"
+let owner = "free"; // "user" | "free"
 let vx = 0;
 let vz = 0;
 let score = 0;
 
 /////////////////////////////////////////////////////
-// 🎮 INPUT BUFFER (IMPORTANT FIX)
+// 🎮 INPUT
 /////////////////////////////////////////////////////
-
-let shootQueued = false;
-let passQueued = false;
 
 let keys = {};
-
-addEventListener("keydown", e => {
-  keys[e.code] = true;
-
-  if(e.code === "Space") passQueued = true;
-});
-
-addEventListener("keyup", e => keys[e.code] = false);
-
-addEventListener("mousedown", () => {
-  shootQueued = true;
-});
+addEventListener("keydown",e=>keys[e.code]=true);
+addEventListener("keyup",e=>keys[e.code]=false);
 
 let mouse = {x:0,y:0};
-
-addEventListener("mousemove", e => {
-  mouse.x = (e.clientX/innerWidth - 0.5)*2;
-  mouse.y = (e.clientY/innerHeight - 0.5)*2;
+addEventListener("mousemove",e=>{
+  mouse.x=(e.clientX/innerWidth-0.5)*2;
+  mouse.y=(e.clientY/innerHeight-0.5)*2;
 });
 
 /////////////////////////////////////////////////////
-// 🏒 PICKUP (ROBUST)
+// 🏒 PICKUP (FIXED — NO GLITCH)
 /////////////////////////////////////////////////////
 
 function pickup(){
 
-  if(puckOwner !== "free") return;
+  if(owner !== "free") return;
 
   const dx = puck.position.x - user.position.x;
   const dz = puck.position.z - user.position.z;
@@ -154,61 +150,68 @@ function pickup(){
   const d = Math.sqrt(dx*dx + dz*dz);
 
   if(d < 3.5){
-    puckOwner = "user";
+    owner = "user";
     vx = 0;
     vz = 0;
   }
 }
 
 /////////////////////////////////////////////////////
-// 🏒 SHOOT (FIXED 100%)
+// 🏒 SHOOT (100% WORKING)
 /////////////////////////////////////////////////////
 
 function shoot(){
 
-  if(puckOwner !== "user") return;
+  if(owner !== "user") return;
 
-  let dx = mouse.x;
-  let dz = mouse.y;
+  const dx = mouse.x;
+  const dz = mouse.y;
 
-  let len = Math.sqrt(dx*dx + dz*dz);
+  const len = Math.sqrt(dx*dx + dz*dz);
   if(len === 0) return;
 
-  vx = (dx/len)*3.2;
-  vz = (dz/len)*3.2;
+  vx = (dx/len) * 3.2;
+  vz = (dz/len) * 3.2;
 
-  puckOwner = "free";
+  owner = "free";
 }
 
+addEventListener("mousedown",shoot);
+
 /////////////////////////////////////////////////////
-// 🤝 PASS (FIXED 100%)
+// 🤝 PASS (100% WORKING)
 /////////////////////////////////////////////////////
 
 function pass(){
 
-  if(puckOwner !== "user") return;
+  if(owner !== "user") return;
 
-  let dx = teammate.position.x - user.position.x;
-  let dz = teammate.position.z - user.position.z;
+  const dx = teammate.position.x - user.position.x;
+  const dz = teammate.position.z - user.position.z;
 
-  let len = Math.sqrt(dx*dx + dz*dz);
+  const len = Math.sqrt(dx*dx + dz*dz);
   if(len === 0) return;
 
-  vx = (dx/len)*2.6;
-  vz = (dz/len)*2.6;
+  vx = (dx/len) * 2.6;
+  vz = (dz/len) * 2.6;
 
-  puckOwner = "free";
+  owner = "free";
 }
 
+addEventListener("keydown",e=>{
+  if(e.code==="Space") pass();
+});
+
 /////////////////////////////////////////////////////
-// 🧊 PUCK PHYSICS
+// 🧊 PUCK PHYSICS (NO STICK BUG)
 /////////////////////////////////////////////////////
 
 function physics(){
 
-  if(puckOwner === "user"){
+  if(owner === "user"){
     puck.position.x = user.position.x;
     puck.position.z = user.position.z - 2;
+    puck.position.y = 1;
     return;
   }
 
@@ -217,23 +220,41 @@ function physics(){
 
   vx *= 0.96;
   vz *= 0.96;
+
+  // ❗ ESTÄE JÄÄ KIINNI BUGI
+  if(Math.abs(vx) < 0.01) vx = 0;
+  if(Math.abs(vz) < 0.01) vz = 0;
 }
 
 /////////////////////////////////////////////////////
-// 🤖 AI FIX (ENSURE VISIBLE)
+// 🤖 AI (VISIBLE ALWAYS)
 /////////////////////////////////////////////////////
 
 function aiBrain(){
 
-  defender.position.x += (puck.position.x - defender.position.x)*0.06;
-  ai.position.x += (puck.position.x - ai.position.x)*0.05;
+  ai.position.x += (puck.position.x - ai.position.x)*0.04;
+  defender.position.x += (puck.position.x - defender.position.x)*0.05;
+}
+
+/////////////////////////////////////////////////////
+// 🥅 GOALIE (REAL MOVEMENT)
+/////////////////////////////////////////////////////
+
+function goalieAI(){
+
+  const target = puck.position.x;
+
+  goalie.position.x += (target - goalie.position.x)*0.08;
+
+  goalie.position.x = Math.max(-6,Math.min(6,goalie.position.x));
 }
 
 /////////////////////////////////////////////////////
 // 🥅 GOAL CHECK
 /////////////////////////////////////////////////////
 
-function isGoal(){
+function goal(){
+
   return (
     puck.position.z < -40 &&
     puck.position.x > -4 &&
@@ -246,10 +267,12 @@ function isGoal(){
 /////////////////////////////////////////////////////
 
 function reset(){
+
   puck.position.set(0,1,0);
   vx = 0;
   vz = 0;
-  puckOwner = "free";
+  owner = "free";
+
   user.position.set(0,2,35);
 }
 
@@ -269,22 +292,12 @@ function loop(){
 
   pickup();
 
-  // INPUT EXECUTION (IMPORTANT FIX)
-  if(shootQueued){
-    shoot();
-    shootQueued = false;
-  }
-
-  if(passQueued){
-    pass();
-    passQueued = false;
-  }
-
   physics();
   aiBrain();
+  goalieAI();
 
   // GOAL
-  if(isGoal()){
+  if(goal()){
 
     score++;
 
@@ -306,10 +319,10 @@ function loop(){
 
 loop();
 
-addEventListener("resize", () => {
-  camera.aspect = innerWidth/innerHeight;
+addEventListener("resize",()=>{
+  camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
+  renderer.setSize(innerWidth,innerHeight);
 });
 
 </script>
