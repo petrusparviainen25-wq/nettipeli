@@ -247,6 +247,14 @@ function goalieAI(){
 
   if(puck.position.z > -20) return;
 
+// 🧤 EXTRA: kovempi laukaus = hitaampi reaktio
+if(vx*vx + vz*vz > 20){
+  goalieDelay += 10;
+}
+
+// 🎯 laskenta
+const goalX = 0;
+const goalZ = -40;
   // 🎲 satunnainen viive 0.2–0.4s (20–40 framea)
   if(goalieDelay <= 0){
     
