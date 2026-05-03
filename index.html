@@ -2,25 +2,26 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>Hockey Movement Safe Fix</title>
+<title>NHL Browser Engine Full Stable</title>
 <style>
-body { margin:0; overflow:hidden; background:#000; }
+body { margin:0; overflow:hidden; background:#87cfff; }
 canvas { display:block; }
 
-#hud {
+#hud{
   position:absolute;
   top:10px;
   left:10px;
   color:white;
   font-family:Arial;
+  font-size:20px;
 }
 
-#msg {
+#msg{
   position:absolute;
   top:50px;
   left:10px;
   color:yellow;
-  font-size:20px;
+  font-size:22px;
 }
 </style>
 </head>
@@ -34,27 +35,26 @@ canvas { display:block; }
 <script>
 
 /////////////////////////////////////////////////////
-// 🌍 WORLD (UNCHANGED - NO DELETIONS)
+// 🌍 WORLD
 /////////////////////////////////////////////////////
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xaad8ff);
-
-scene.add(new THREE.AmbientLight(0xffffff,0.9));
-
-const light = new THREE.DirectionalLight(0xffffff,1.5);
-light.position.set(10,30,10);
-scene.add(light);
 
 const camera = new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.1,1000);
-camera.position.set(0,28,55);
+camera.position.set(0,30,60);
 
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth,innerHeight);
 document.body.appendChild(renderer.domElement);
 
+scene.add(new THREE.AmbientLight(0xffffff,0.9));
+
+const light = new THREE.DirectionalLight(0xffffff,1.2);
+light.position.set(10,30,10);
+scene.add(light);
+
 /////////////////////////////////////////////////////
-// 🧊 ICE (UNCHANGED)
+// 🧊 ICE
 /////////////////////////////////////////////////////
 
 const ice = new THREE.Mesh(
@@ -65,7 +65,29 @@ ice.rotation.x = -Math.PI/2;
 scene.add(ice);
 
 /////////////////////////////////////////////////////
-// 🧍 PLAYERS (UNCHANGED)
+// 🥅 GOAL
+/////////////////////////////////////////////////////
+
+function createGoal(){
+  const g = new THREE.Group();
+
+  const mat = new THREE.MeshStandardMaterial({color:0xff0000});
+
+  const left = new THREE.Mesh(new THREE.BoxGeometry(0.5,8,0.5),mat);
+  const right = new THREE.Mesh(new THREE.BoxGeometry(0.5,8,0.5),mat);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(12,0.5,0.5),mat);
+
+  left.position.set(-6,4,-40);
+  right.position.set(6,4,-40);
+  top.position.set(0,8,-40);
+
+  g.add(left,right,top);
+  scene.add(g);
+}
+createGoal();
+
+/////////////////////////////////////////////////////
+// 🧍 PLAYERS
 /////////////////////////////////////////////////////
 
 function player(color,z){
@@ -80,49 +102,221 @@ function player(color,z){
 
 const user = player(0x0066ff,35);
 const teammate = player(0x3399ff,25);
+const ai = player(0xff3333,-30);
+const defender = player(0xff7777,-15);
 
 /////////////////////////////////////////////////////
-// 🧠 STATE (UNCHANGED)
+// 🥅 GOALIE
 /////////////////////////////////////////////////////
 
+const goalie = new THREE.Mesh(
+  new THREE.CapsuleGeometry(1.6,2.5,6,10),
+  new THREE.MeshStandardMaterial({color:0xffffff})
+);
+goalie.position.set(0,2,-38);
+scene.add(goalie);
+
+/////////////////////////////////////////////////////
+// 🏒 PUCK
+/////////////////////////////////////////////////////
+
+const puck = new THREE.Mesh(
+  new THREE.CylinderGeometry(1,1,0.5,16),
+  new THREE.MeshStandardMaterial({color:0x000000})
+);
+puck.rotation.x = Math.PI/2;
+scene.add(puck);
+
+/////////////////////////////////////////////////////
+// 🧠 STATE
+/////////////////////////////////////////////////////
+
+let owner = "free";
 let controlled = "user";
 
+let vx=0, vz=0, vy=0;
+
+let mouse = {x:0,y:0};
+let keys = {};
+
+let score = 0;
+
+/////////////////////////////////////////////////////
+// 🎮 INPUT
+/////////////////////////////////////////////////////
+
+addEventListener("keydown",e=>keys[e.code]=true);
+addEventListener("keyup",e=>keys[e.code]=false);
+
+addEventListener("mousemove",e=>{
+  mouse.x = (e.clientX/innerWidth - 0.5)*2;
+  mouse.y = (e.clientY/innerHeight - 0.5)*2;
+});
+
+/////////////////////////////////////////////////////
+// 🧍 ACTIVE PLAYER
+/////////////////////////////////////////////////////
+
 function active(){
-  return controlled === "user" ? user : teammate;
+  return controlled==="user"?user:teammate;
 }
 
 /////////////////////////////////////////////////////
-// 🎮 ONLY ADDITION: MOVEMENT INPUT
+// 🏒 PICKUP
 /////////////////////////////////////////////////////
 
-let keys = {};
+function pickup(){
+  if(owner!=="free") return;
 
-addEventListener("keydown", e => {
-  keys[e.code] = true;
-});
+  const p = active();
+  let dx=puck.position.x-p.position.x;
+  let dz=puck.position.z-p.position.z;
 
-addEventListener("keyup", e => {
-  keys[e.code] = false;
+  if(Math.sqrt(dx*dx+dz*dz)<3.5){
+    owner=controlled;
+    vx=vz=vy=0;
+  }
+}
+
+/////////////////////////////////////////////////////
+// 🏒 SHOOT (REALISTIC + HEIGHT)
+/////////////////////////////////////////////////////
+
+function shoot(){
+  if(owner!==controlled) return;
+
+  let dx=mouse.x;
+  let dz=mouse.y;
+
+  let len=Math.sqrt(dx*dx+dz*dz);
+  if(len===0) return;
+
+  vx=(dx/len)*3.2;
+  vz=(dz/len)*3.2;
+
+  // 🎯 height control
+  vy=Math.max(0,-mouse.y*1.8);
+
+  owner="free";
+}
+
+addEventListener("mousedown",shoot);
+
+/////////////////////////////////////////////////////
+// 🤝 PASS
+/////////////////////////////////////////////////////
+
+function pass(){
+  if(owner!==controlled) return;
+
+  const t = controlled==="user"?teammate:user;
+
+  let dx=t.position.x-active().position.x;
+  let dz=t.position.z-active().position.z;
+
+  let len=Math.sqrt(dx*dx+dz*dz);
+
+  vx=(dx/len)*2.6;
+  vz=(dz/len)*2.6;
+  vy=0;
+
+  owner="free";
+  controlled=controlled==="user"?"teammate":"user";
+}
+
+addEventListener("keydown",e=>{
+  if(e.code==="Space") pass();
 });
 
 /////////////////////////////////////////////////////
-// 🎮 LOOP (ONLY MOVEMENT ADDED, NOTHING REMOVED)
+// 🧊 PHYSICS
+/////////////////////////////////////////////////////
+
+function physics(){
+
+  if(owner!=="free"){
+    const p=active();
+    puck.position.x=p.position.x;
+    puck.position.z=p.position.z-2;
+    puck.position.y=1;
+    return;
+  }
+
+  puck.position.x+=vx;
+  puck.position.z+=vz;
+
+  puck.position.y+=vy;
+  vy-=0.1;
+
+  if(puck.position.y<1){
+    puck.position.y=1;
+    vy=0;
+  }
+
+  vx*=0.96;
+  vz*=0.96;
+}
+
+/////////////////////////////////////////////////////
+// 🤖 AI
+/////////////////////////////////////////////////////
+
+function aiMove(){
+  ai.position.x+=(puck.position.x-ai.position.x)*0.03;
+  defender.position.x+=(puck.position.x-defender.position.x)*0.03;
+
+  goalie.position.x+=(puck.position.x-goalie.position.x)*0.05;
+  goalie.position.x=Math.max(-6,Math.min(6,goalie.position.x));
+}
+
+/////////////////////////////////////////////////////
+// 🥅 GOAL CHECK
+/////////////////////////////////////////////////////
+
+function goal(){
+  if(puck.position.z<-40 &&
+     puck.position.x>-6 &&
+     puck.position.x<6){
+    score++;
+    document.getElementById("hud").innerText="0 - "+score;
+    reset();
+  }
+}
+
+function reset(){
+  puck.position.set(0,1,0);
+  vx=vz=vy=0;
+  owner="free";
+}
+
+/////////////////////////////////////////////////////
+// 🎮 MOVEMENT
+/////////////////////////////////////////////////////
+
+function movePlayer(){
+  const p=active();
+
+  if(keys["KeyA"])p.position.x-=0.9;
+  if(keys["KeyD"])p.position.x+=0.9;
+  if(keys["KeyW"])p.position.z-=0.9;
+  if(keys["KeyS"])p.position.z+=0.9;
+}
+
+/////////////////////////////////////////////////////
+// 🎥 LOOP
 /////////////////////////////////////////////////////
 
 function loop(){
-
   requestAnimationFrame(loop);
 
-  const p = active();
+  movePlayer();
+  pickup();
+  physics();
+  aiMove();
+  goal();
 
-  // 🧍 ONLY FIX: PLAYER MOVEMENT RESTORED
-  if(keys["KeyA"]) p.position.x -= 0.9;
-  if(keys["KeyD"]) p.position.x += 0.9;
-  if(keys["KeyW"]) p.position.z -= 0.9;
-  if(keys["KeyS"]) p.position.z += 0.9;
-
-  camera.position.x += (p.position.x - camera.position.x)*0.04;
-  camera.lookAt(p.position.x,0,0);
+  camera.position.x+=(active().position.x-camera.position.x)*0.05;
+  camera.lookAt(active().position.x,0,0);
 
   renderer.render(scene,camera);
 }
