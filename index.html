@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL GAMEPLAY LOOP</title>
+<title>NHL FIXED GAME</title>
 <style>
 body { margin:0; overflow:hidden; background:#000; }
 canvas { display:block; }
@@ -24,7 +24,7 @@ canvas { display:block; }
 
 <script>
 
-// ================= SCENE =================
+// ================= BASIC SETUP =================
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xaadfff);
 
@@ -36,14 +36,13 @@ const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// LIGHT
 scene.add(new THREE.DirectionalLight(0xffffff,1.2).position.set(10,30,10));
-scene.add(new THREE.AmbientLight(0x666666));
+scene.add(new THREE.AmbientLight(0x777777));
 
 // ================= ICE =================
 const ice = new THREE.Mesh(
   new THREE.PlaneGeometry(120,80),
-  new THREE.MeshStandardMaterial({color:0xe8f6ff, roughness:0.05})
+  new THREE.MeshStandardMaterial({color:0xe8f6ff, roughness:0.1})
 );
 ice.rotation.x = -Math.PI/2;
 scene.add(ice);
@@ -58,13 +57,13 @@ player.add(pBody);
 player.position.set(0,2,30);
 scene.add(player);
 
-// ================= AI PLAYER =================
+// ================= AI =================
 const ai = new THREE.Group();
-const aiBody = new THREE.Mesh(
+const aBody = new THREE.Mesh(
   new THREE.CapsuleGeometry(1.2,2,4,8),
   new THREE.MeshStandardMaterial({color:0xff3333})
 );
-ai.add(aiBody);
+ai.add(aBody);
 ai.position.set(0,2,-30);
 scene.add(ai);
 
@@ -90,7 +89,6 @@ let keys = {};
 document.addEventListener("keydown",e=>keys[e.code]=true);
 document.addEventListener("keyup",e=>keys[e.code]=false);
 
-// mouse aim
 let mouse = {x:0,y:0};
 let aim = new THREE.Vector3();
 let aimSmooth = new THREE.Vector3();
@@ -103,34 +101,43 @@ window.addEventListener("mousemove",(e)=>{
 // ================= GAME STATE =================
 let vx=0, vz=0;
 let hasPuck=false;
-
 let playerScore=0;
 let aiScore=0;
 
-// ================= SHOOT =================
+// ================= SHOOT (FIXED) =================
 window.addEventListener("mousedown",()=>{
 
-  if(hasPuck){
-    vx = (aimSmooth.x - player.position.x) * 0.3;
-    vz = (aimSmooth.z - player.position.z) * 0.3;
-    hasPuck = false;
-  }
+  if(!hasPuck) return;
+
+  vx = (aimSmooth.x - player.position.x) * 0.32;
+  vz = (aimSmooth.z - player.position.z) * 0.32;
+
+  hasPuck = false;
 });
 
-// ================= AI LOGIC =================
-function aiMove(){
+// ================= RESET =================
+function reset(){
+  puck.position.set(0,1,0);
+  vx=0; vz=0;
+  hasPuck=false;
 
-  // AI seuraa kiekkoa
-  ai.position.x += (puck.position.x - ai.position.x) * 0.05;
+  player.position.set(0,2,30);
+  ai.position.set(0,2,-30);
+}
 
-  // AI “paineistaa” jos kiekko on sen alueella
+// ================= AI =================
+function aiLogic(){
+
+  ai.position.x += (puck.position.x - ai.position.x) * 0.06;
+
+  // AI attack/defense logic
   if(puck.position.z < -10){
-    ai.position.z += 0.03;
+    ai.position.z += 0.04;
   } else {
     ai.position.z -= 0.02;
   }
 
-  ai.position.z = Math.max(-35, Math.min(-5, ai.position.z));
+  ai.position.z = Math.max(-35,Math.min(-5,ai.position.z));
 }
 
 // ================= LOOP =================
@@ -152,72 +159,67 @@ function animate(){
   aim.z = player.position.z + mouse.y * 18 - 15;
   aimSmooth.lerp(aim,0.2);
 
-  // ================= PUCK CONTROL =================
+  // ================= PUCK PICKUP (FIXED) =================
   let dx = puck.position.x - player.position.x;
   let dz = puck.position.z - player.position.z;
   let dist = Math.sqrt(dx*dx + dz*dz);
 
-  if(dist < 4 && !hasPuck){
+  if(dist < 3.8){
     hasPuck = true;
   }
 
+  // release safety
+  if(hasPuck && dist > 6){
+    hasPuck = false;
+  }
+
+  // ================= PUCK CONTROL =================
   if(hasPuck){
     puck.position.x = player.position.x;
     puck.position.z = player.position.z - 2;
     puck.position.y = 1;
-    vx = 0; vz = 0;
+  } else {
+    puck.position.x += vx;
+    puck.position.z += vz;
+
+    vx *= 0.97;
+    vz *= 0.97;
   }
 
-  // ================= PUCK MOVE =================
-  puck.position.x += vx;
-  puck.position.z += vz;
-
-  vx *= 0.97;
-  vz *= 0.97;
-
   // ================= AI =================
-  aiMove();
+  aiLogic();
 
-  // AI steal (yksinkertainen)
+  // AI steal
   let dx2 = puck.position.x - ai.position.x;
   let dz2 = puck.position.z - ai.position.z;
   let dist2 = Math.sqrt(dx2*dx2 + dz2*dz2);
 
-  if(dist2 < 4 && !hasPuck){
+  if(dist2 < 3.5 && !hasPuck){
     vx = (player.position.x - ai.position.x) * 0.25;
     vz = (player.position.z - ai.position.z) * 0.25;
   }
 
-  // ================= GOAL =================
+  // ================= GOALS =================
   if(puck.position.z < -35){
     playerScore++;
+    document.getElementById("hud").innerText =
+      `YOU ${playerScore} - ${aiScore} AI`;
     reset();
   }
 
   if(puck.position.z > 35){
     aiScore++;
+    document.getElementById("hud").innerText =
+      `YOU ${playerScore} - ${aiScore} AI`;
     reset();
   }
-
-  document.getElementById("hud").innerText =
-    `YOU ${playerScore} - ${aiScore} AI`;
 
   renderer.render(scene,camera);
 }
 
-// ================= RESET =================
-function reset(){
-  puck.position.set(0,1,0);
-  vx=0; vz=0;
-  hasPuck=false;
-
-  player.position.set(0,2,30);
-  ai.position.set(0,2,-30);
-}
-
 animate();
 
-// resize
+// ================= RESIZE =================
 window.addEventListener("resize",()=>{
   camera.aspect = window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
