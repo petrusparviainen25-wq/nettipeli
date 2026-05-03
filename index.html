@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL</title>
+<title>NHL 3D FIXED</title>
 <style>
 body { margin:0; overflow:hidden; background:black; }
 canvas { display:block; }
@@ -110,19 +110,11 @@ window.addEventListener("mousemove",(e)=>{
 });
 
 // ================= PHYSICS =================
-let vx = 0, vz = 0, vy = 0;
+let vx = 0, vz = 0;
 let hasPuck = false;
+let targetHeight = 1;
 
-// clamp speed
-function clampSpeed(){
-  let s = Math.sqrt(vx*vx + vz*vz);
-  if(s > 1.4){
-    vx = (vx/s)*1.4;
-    vz = (vz/s)*1.4;
-  }
-}
-
-// ================= SHOOT (AIM + HIGH/LOW) =================
+// ================= SHOOT (REAL NHL STYLE) =================
 window.addEventListener("mousedown",()=>{
 
   if(hasPuck){
@@ -130,8 +122,8 @@ window.addEventListener("mousedown",()=>{
     vx = (aim.x - player.position.x) * 0.25;
     vz = (aim.z - player.position.z) * 0.25;
 
-    // 🎯 HI HIGH / LOW LOW
-    vy = -mouse.y * 1.2;
+    // 🎯 korkeus = ei kaari, vaan “lift level”
+    targetHeight = 1 + (-mouse.y * 2);
 
     hasPuck = false;
   }
@@ -155,18 +147,22 @@ function animate(){
   aim.x = player.position.x + mouse.x * 15;
   aim.z = player.position.z - 20 + mouse.y * 15;
 
-  // 🏒 PUCK PHYSICS
+  // 🏒 PUCK MOVE
   puck.position.x += vx;
   puck.position.z += vz;
-  puck.position.y += vy;
 
   vx *= 0.98;
   vz *= 0.98;
-  vy -= 0.04; // gravity
 
-  clampSpeed();
+  // 🧊 NHL STYLE HEIGHT (EI KAARTA)
+  puck.position.y += (targetHeight - puck.position.y) * 0.2;
 
-  // 🧠 PUCK CONTROL (STICK GLUE)
+  // 🧱 STOP FALL THROUGH ICE
+  if(puck.position.z > -35 && puck.position.y < 1){
+    puck.position.y = 1;
+  }
+
+  // 🧠 STICK CONTROL
   let dx = puck.position.x - player.position.x;
   let dz = puck.position.z - player.position.z;
   let dist = Math.sqrt(dx*dx + dz*dz);
@@ -179,25 +175,26 @@ function animate(){
     puck.position.x = player.position.x;
     puck.position.z = player.position.z - 2;
     puck.position.y = 1;
-    vx = 0; vz = 0; vy = 0;
+    vx = 0;
+    vz = 0;
   }
 
   // 🥅 GOALIE AI
   goalie.position.x += (puck.position.x - goalie.position.x) * 0.05;
 
-  // 🧤 SAVE (vain matalat laukaukset)
+  // 🧤 SAVE (vain matala kiekko)
   if(puck.position.z < -30 &&
      Math.abs(puck.position.x - goalie.position.x) < 3 &&
      puck.position.y < 3){
     vz *= -0.6;
-    vy *= -0.3;
   }
 
   // 🥅 GOAL RESET
   if(puck.position.z < -35){
     puck.position.set(0,1,10);
-    vx = 0; vz = 0; vy = 0;
+    vx = 0; vz = 0;
     hasPuck = false;
+    targetHeight = 1;
   }
 
   renderer.render(scene,camera);
