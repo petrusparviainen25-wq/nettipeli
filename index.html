@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>Hockey Full Fixed V2</title>
+<title>Hockey FULL V3</title>
 <style>
 body { margin:0; overflow:hidden; background:#000; }
 canvas { display:block; }
@@ -68,7 +68,7 @@ scene.add(ice);
 // 🥅 GOAL
 /////////////////////////////////////////////////////
 
-function makeGoal(){
+function goal(){
   const g = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({color:0xff0000});
 
@@ -83,7 +83,7 @@ function makeGoal(){
   g.add(l,r,t);
   scene.add(g);
 }
-makeGoal();
+goal();
 
 /////////////////////////////////////////////////////
 // 🥅 GOALIE
@@ -130,13 +130,16 @@ scene.add(puck);
 // 🧠 STATE
 /////////////////////////////////////////////////////
 
-let owner = "free"; // "user" | "teammate" | "free"
+let owner = "free";
 let vx = 0;
 let vz = 0;
 let score = 0;
 
+let controlled = "user";
 let actionLock = false;
-let controlledPlayer = "user";
+
+let mouse = {x:0,y:0};
+let highShot = false;
 
 /////////////////////////////////////////////////////
 // 🎮 INPUT
@@ -146,23 +149,20 @@ let keys = {};
 addEventListener("keydown",e=>keys[e.code]=true);
 addEventListener("keyup",e=>keys[e.code]=false);
 
-let mouse = {x:0,y:0};
-let shotHeight = 0;
-
 addEventListener("mousemove",e=>{
-  mouse.x=(e.clientX/innerWidth-0.5)*2;
-  mouse.y=(e.clientY/innerHeight-0.5)*2;
+  mouse.x = (e.clientX/innerWidth - 0.5)*2;
+  mouse.y = (e.clientY/innerHeight - 0.5)*2;
 
-  // 🏒 HIGH SHOT DETECTION
-  shotHeight = (mouse.y < -0.3) ? 1 : 0;
+  // ✔ HIGH SHOT FIX (NOW USED PROPERLY)
+  highShot = mouse.y < -0.25;
 });
 
 /////////////////////////////////////////////////////
 // 🧍 ACTIVE PLAYER
 /////////////////////////////////////////////////////
 
-function activePlayer(){
-  return controlledPlayer === "user" ? user : teammate;
+function p(){
+  return controlled === "user" ? user : teammate;
 }
 
 /////////////////////////////////////////////////////
@@ -174,27 +174,27 @@ function pickup(){
   if(owner !== "free") return;
   if(actionLock) return;
 
-  const p = activePlayer();
+  const pl = p();
 
-  const dx = puck.position.x - p.position.x;
-  const dz = puck.position.z - p.position.z;
+  const dx = puck.position.x - pl.position.x;
+  const dz = puck.position.z - pl.position.z;
 
   const d = Math.sqrt(dx*dx + dz*dz);
 
   if(d < 3.5){
-    owner = controlledPlayer;
+    owner = controlled;
     vx = 0;
     vz = 0;
   }
 }
 
 /////////////////////////////////////////////////////
-// 🏒 SHOOT (HIGH + LOW)
+// 🏒 SHOOT (HIGH + LOW WORKING)
 /////////////////////////////////////////////////////
 
 function shoot(){
 
-  if(owner !== controlledPlayer) return;
+  if(owner !== controlled) return;
   if(actionLock) return;
 
   actionLock = true;
@@ -207,14 +207,16 @@ function shoot(){
 
   let power = 3.2;
 
-  // 🏒 HIGH SHOT
-  if(shotHeight === 1){
+  // ✔ HIGH SHOT FIX
+  if(highShot){
     power = 2.6;
     puck.position.y = 2.5;
+  } else {
+    puck.position.y = 1;
   }
 
-  vx = (dx/len) * power;
-  vz = (dz/len) * power;
+  vx = (dx/len)*power;
+  vz = (dz/len)*power;
 
   owner = "free";
 
@@ -224,31 +226,31 @@ function shoot(){
 addEventListener("mousedown",shoot);
 
 /////////////////////////////////////////////////////
-// 🤝 PASS + PLAYER SWITCH
+// 🤝 PASS + SWITCH (FIXED)
 /////////////////////////////////////////////////////
 
 function pass(){
 
-  if(owner !== controlledPlayer) return;
+  if(owner !== controlled) return;
   if(actionLock) return;
 
   actionLock = true;
 
-  const target = controlledPlayer === "user" ? teammate : user;
+  const target = controlled === "user" ? teammate : user;
 
-  const dx = target.position.x - activePlayer().position.x;
-  const dz = target.position.z - activePlayer().position.z;
+  const dx = target.position.x - p().position.x;
+  const dz = target.position.z - p().position.z;
 
   const len = Math.sqrt(dx*dx + dz*dz);
   if(len === 0){ actionLock=false; return; }
 
-  vx = (dx/len) * 2.6;
-  vz = (dz/len) * 2.6;
+  vx = (dx/len)*2.6;
+  vz = (dz/len)*2.6;
 
   owner = "free";
 
-  // 🧠 NHL-STYLE SWITCH CONTROL
-  controlledPlayer = controlledPlayer === "user" ? "teammate" : "user";
+  // ✔ NHL STYLE SWITCH
+  controlled = controlled === "user" ? "teammate" : "user";
 
   setTimeout(()=>actionLock=false,80);
 }
@@ -264,10 +266,9 @@ addEventListener("keydown",e=>{
 function physics(){
 
   if(owner !== "free"){
-    const p = activePlayer();
-    puck.position.x = p.position.x;
-    puck.position.z = p.position.z - 2;
-    puck.position.y = 1;
+    const pl = p();
+    puck.position.x = pl.position.x;
+    puck.position.z = pl.position.z - 2;
     return;
   }
 
@@ -285,7 +286,7 @@ function physics(){
 // 🤖 AI
 /////////////////////////////////////////////////////
 
-function aiBrain(){
+function ai(){
 
   ai.position.x += (puck.position.x - ai.position.x)*0.05;
   defender.position.x += (puck.position.x - defender.position.x)*0.05;
@@ -301,11 +302,10 @@ function goalieAI(){
 }
 
 /////////////////////////////////////////////////////
-// 🥅 GOAL
+// 🥅 GOAL CHECK
 /////////////////////////////////////////////////////
 
-function goal(){
-
+function isGoal(){
   return (
     puck.position.z < -40 &&
     puck.position.x > -4 &&
@@ -318,10 +318,13 @@ function goal(){
 /////////////////////////////////////////////////////
 
 function reset(){
+
   puck.position.set(0,1,0);
-  vx=0;vz=0;
-  owner="free";
-  controlledPlayer="user";
+  vx = 0;
+  vz = 0;
+  owner = "free";
+  controlled = "user";
+
   user.position.set(0,2,35);
 }
 
@@ -333,19 +336,19 @@ function loop(){
 
   requestAnimationFrame(loop);
 
-  const p = activePlayer();
+  const pl = p();
 
-  if(keys["KeyA"]) p.position.x -= 0.9;
-  if(keys["KeyD"]) p.position.x += 0.9;
-  if(keys["KeyW"]) p.position.z -= 0.9;
-  if(keys["KeyS"]) p.position.z += 0.9;
+  if(keys["KeyA"]) pl.position.x -= 0.9;
+  if(keys["KeyD"]) pl.position.x += 0.9;
+  if(keys["KeyW"]) pl.position.z -= 0.9;
+  if(keys["KeyS"]) pl.position.z += 0.9;
 
   pickup();
   physics();
-  aiBrain();
+  ai();
   goalieAI();
 
-  if(goal()){
+  if(isGoal()){
 
     score++;
 
@@ -359,8 +362,8 @@ function loop(){
     reset();
   }
 
-  camera.position.x += (p.position.x - camera.position.x)*0.04;
-  camera.lookAt(p.position.x,0,0);
+  camera.position.x += (pl.position.x - camera.position.x)*0.04;
+  camera.lookAt(pl.position.x,0,0);
 
   renderer.render(scene,camera);
 }
