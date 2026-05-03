@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>EA-STYLE NHL BROWSER ENGINE</title>
+<title>Hockey Engine v2</title>
 <style>
 body { margin:0; overflow:hidden; background:#000; }
 canvas { display:block; }
@@ -13,29 +13,19 @@ canvas { display:block; }
   left:10px;
   color:white;
   font-family:Arial;
-  font-size:18px;
-}
-
-#replay {
-  position:absolute;
-  top:50px;
-  left:10px;
-  color:yellow;
-  font-size:20px;
 }
 </style>
 </head>
 <body>
 
 <div id="hud">SINÄ 0 - 0 AI</div>
-<div id="replay"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
 <script>
 
 /////////////////////////////////////////////////////
-// 🌍 WORLD
+// 🌍 SCENE
 /////////////////////////////////////////////////////
 
 const scene = new THREE.Scene();
@@ -63,38 +53,47 @@ document.body.appendChild(renderer.domElement);
 /////////////////////////////////////////////////////
 
 const ice = new THREE.Mesh(
-  new THREE.PlaneGeometry(180,110),
-  new THREE.MeshStandardMaterial({
-    color:0xdff6ff,
-    roughness:0.05,
-    metalness:0.2
-  })
+  new THREE.PlaneGeometry(200,120),
+  new THREE.MeshStandardMaterial({color:0xdff6ff, roughness:0.05})
 );
 ice.rotation.x = -Math.PI/2;
 scene.add(ice);
 
 /////////////////////////////////////////////////////
-// 🧍 PLAYER SYSTEM (STATE MACHINE)
+// 🧱 BOARDS (TÄRKEÄ UUTUUS)
 /////////////////////////////////////////////////////
 
-function makePlayer(color,z){
+const boardMat = new THREE.MeshStandardMaterial({color:0xffffff});
+
+function board(x,z,w,h){
+  const b = new THREE.Mesh(new THREE.BoxGeometry(w,2,h),boardMat);
+  b.position.set(x,1,z);
+  scene.add(b);
+  return b;
+}
+
+// kentän reunat
+board(0,60,180,2);
+board(0,-60,180,2);
+board(90,0,2,120);
+board(-90,0,2,120);
+
+/////////////////////////////////////////////////////
+// 🏒 PLAYER
+/////////////////////////////////////////////////////
+
+function player(color,z){
   const p = new THREE.Mesh(
     new THREE.CapsuleGeometry(1.2,2,6,10),
     new THREE.MeshStandardMaterial({color})
   );
-
   p.position.set(0,2,z);
-
-  p.state = "idle";
-  p.vx = 0;
-  p.vz = 0;
-
   scene.add(p);
   return p;
 }
 
-const player = makePlayer(0x0066ff,35);
-const ai = makePlayer(0xff3333,-35);
+const user = player(0x0066ff,35);
+const ai = player(0xff3333,-35);
 
 /////////////////////////////////////////////////////
 // 🥅 GOALIE
@@ -112,7 +111,7 @@ scene.add(goalie);
 /////////////////////////////////////////////////////
 
 const puck = new THREE.Mesh(
-  new THREE.CylinderGeometry(1,1,0.5,18),
+  new THREE.CylinderGeometry(1,1,0.5,16),
   new THREE.MeshStandardMaterial({color:0x000000})
 );
 puck.rotation.x = Math.PI/2;
@@ -122,18 +121,18 @@ scene.add(puck);
 // 🎮 INPUT
 /////////////////////////////////////////////////////
 
-let keys = {};
+let keys={};
 addEventListener("keydown",e=>keys[e.code]=true);
 addEventListener("keyup",e=>keys[e.code]=false);
 
-let mouse = {x:0,y:0};
+let mouse={x:0,y:0};
 addEventListener("mousemove",e=>{
   mouse.x=(e.clientX/innerWidth-0.5)*2;
   mouse.y=(e.clientY/innerHeight-0.5)*2;
 });
 
 /////////////////////////////////////////////////////
-// 🧠 GAME STATE
+// 🧠 STATE
 /////////////////////////////////////////////////////
 
 let vx=0,vz=0;
@@ -141,72 +140,73 @@ let hasPuck=false;
 let score=0;
 
 /////////////////////////////////////////////////////
-// 🎞️ REPLAY SYSTEM (EA FEATURE)
-/////////////////////////////////////////////////////
-
-let replayBuffer = [];
-
-function saveFrame(){
-  replayBuffer.push({
-    puck:{x:puck.position.x,z:puck.position.z}
-  });
-
-  if(replayBuffer.length > 120) replayBuffer.shift();
-}
-
-/////////////////////////////////////////////////////
-// 🏒 SHOOT
+// 🏒 SHOOT (physics impulse)
 /////////////////////////////////////////////////////
 
 addEventListener("mousedown",()=>{
 
   if(!hasPuck) return;
 
-  const aimX = player.position.x + mouse.x*30;
-  const aimZ = player.position.z + mouse.y*30 - 15;
+  const dirX = mouse.x;
+  const dirZ = mouse.y;
 
-  vx = (aimX - player.position.x) * 0.30;
-  vz = (aimZ - player.position.z) * 0.30;
+  const len = Math.sqrt(dirX*dirX+dirZ*dirZ);
 
-  hasPuck = false;
+  vx = (dirX/len) * 1.5;
+  vz = (dirZ/len) * 1.5;
+
+  hasPuck=false;
 });
 
 /////////////////////////////////////////////////////
-// 🤖 AI (EA-style decision delay)
+// 🤖 AI FORMATION (2-1-2 basic)
 /////////////////////////////////////////////////////
 
-function aiBrain(){
+function aiFormation(){
 
-  let attack = puck.position.z < -5;
+  // center
+  ai.position.x += (puck.position.x - ai.position.x)*0.05;
 
-  let target = attack ? puck.position.x : 0;
+  // puolustusvyöhyke
+  if(puck.position.z < 10){
+    ai.position.z += 0.04;
+  } else {
+    ai.position.z -= 0.02;
+  }
 
-  ai.position.x += (target - ai.position.x)*0.05;
-
-  ai.position.z += attack ? 0.06 : -0.03;
-
-  ai.position.x = clamp(ai.position.x,-70,70);
-  ai.position.z = clamp(ai.position.z,-45,-5);
+  ai.position.x = Math.max(-80,Math.min(80,ai.position.x));
 }
 
 /////////////////////////////////////////////////////
-// 🥅 GOALIE (prediction model)
+// 🥅 GOALIE AI (angle block)
 /////////////////////////////////////////////////////
 
 function goalieAI(){
 
-  let predictX = puck.position.x + vx*5;
+  const target = puck.position.x;
 
-  goalie.position.x += (predictX - goalie.position.x)*0.12;
-  goalie.position.x = clamp(goalie.position.x,-6,6);
-
+  goalie.position.x += (target - goalie.position.x)*0.12;
+  goalie.position.x = Math.max(-6,Math.min(6,goalie.position.x));
   goalie.position.z = -38;
 }
 
-function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+/////////////////////////////////////////////////////
+// 🧱 BOARD COLLISIONS (TÄRKEÄ FIX)
+/////////////////////////////////////////////////////
+
+function boardCollision(){
+
+  if(puck.position.x > 88 || puck.position.x < -88){
+    vx *= -0.7;
+  }
+
+  if(puck.position.z > 58 || puck.position.z < -58){
+    vz *= -0.7;
+  }
+}
 
 /////////////////////////////////////////////////////
-// 🔁 RESET + REPLAY TRIGGER
+// 🧊 RESET
 /////////////////////////////////////////////////////
 
 function reset(){
@@ -214,109 +214,94 @@ function reset(){
   vx=0;vz=0;
   hasPuck=false;
 
-  player.position.set(0,2,35);
+  user.position.set(0,2,35);
   ai.position.set(0,2,-35);
   goalie.position.set(0,2,-38);
 }
 
 /////////////////////////////////////////////////////
-// 🎮 MAIN ENGINE LOOP (EA STYLE SIM STEP)
+// 🎮 LOOP
 /////////////////////////////////////////////////////
 
 function loop(){
 
   requestAnimationFrame(loop);
 
-  saveFrame();
-
   /////////////////////////////////////////////////////
-  // 🧍 PLAYER STATE MACHINE (simplified)
+  // PLAYER SKATE (momentum feel)
   /////////////////////////////////////////////////////
 
-  let speed = 0.9;
+  let speed=0.9;
 
-  if(keys["KeyA"]) player.position.x -= speed;
-  if(keys["KeyD"]) player.position.x += speed;
-  if(keys["KeyW"]) player.position.z -= speed;
-  if(keys["KeyS"]) player.position.z += speed;
-
-  player.position.x = clamp(player.position.x,-70,70);
-  player.position.z = clamp(player.position.z,-20,60);
+  if(keys["KeyA"]) user.position.x -= speed;
+  if(keys["KeyD"]) user.position.x += speed;
+  if(keys["KeyW"]) user.position.z -= speed;
+  if(keys["KeyS"]) user.position.z += speed;
 
   /////////////////////////////////////////////////////
-  // 🏒 PUCK CONTROL (EA stick feel)
+  // PUCK PICKUP
   /////////////////////////////////////////////////////
 
-  let dx = puck.position.x - player.position.x;
-  let dz = puck.position.z - player.position.z;
-  let dist = Math.sqrt(dx*dx+dz*dz);
+  let dx=puck.position.x-user.position.x;
+  let dz=puck.position.z-user.position.z;
+  let dist=Math.sqrt(dx*dx+dz*dz);
 
-  if(dist < 3.5) hasPuck = true;
+  if(dist<3.5) hasPuck=true;
+
+  /////////////////////////////////////////////////////
+  // PUCK PHYSICS (ice friction)
+  /////////////////////////////////////////////////////
 
   if(hasPuck){
-    puck.position.x = player.position.x;
-    puck.position.z = player.position.z - 2;
-    puck.position.y = 1;
+    puck.position.x=user.position.x;
+    puck.position.z=user.position.z-2;
   } else {
-    puck.position.x += vx;
-    puck.position.z += vz;
+    puck.position.x+=vx;
+    puck.position.z+=vz;
 
-    vx *= 0.965;
-    vz *= 0.965;
+    vx*=0.96;
+    vz*=0.96;
   }
 
   /////////////////////////////////////////////////////
-  // 🤖 AI + 🥅 GOALIE
+  // SYSTEMS
   /////////////////////////////////////////////////////
 
-  aiBrain();
+  aiFormation();
   goalieAI();
+  boardCollision();
 
   /////////////////////////////////////////////////////
-  // 🧤 SAVE MODEL (EA-style probability feel)
+  // SAVE
   /////////////////////////////////////////////////////
 
-  if(puck.position.z < -37 &&
-     Math.abs(puck.position.x - goalie.position.x) < 3){
-    vx *= -0.5;
+  if(puck.position.z<-37 &&
+     Math.abs(puck.position.x-goalie.position.x)<3){
+    vx*=-0.5;
   }
 
   /////////////////////////////////////////////////////
-  // 🥅 GOAL EVENT + REPLAY TRIGGER
+  // GOAL
   /////////////////////////////////////////////////////
 
-  if(puck.position.z < -40){
-
+  if(puck.position.z<-40){
     score++;
-
-    document.getElementById("hud").innerText =
-      "SINÄ " + score + " - AI 0";
-
-    document.getElementById("replay").innerText =
-      "REPLAY (EA STYLE SIM)";
-
-    setTimeout(()=>{
-      document.getElementById("replay").innerText="";
-    },1200);
-
+    document.getElementById("hud").innerText=
+      "SINÄ "+score+" - AI 0";
     reset();
   }
 
   /////////////////////////////////////////////////////
-  // 🎥 BROADCAST CAMERA (EA feel)
+  // CAMERA (broadcast style)
   /////////////////////////////////////////////////////
 
-  camera.position.x += (player.position.x - camera.position.x)*0.04;
-  camera.lookAt(player.position.x,0,0);
+  camera.position.x+=(user.position.x-camera.position.x)*0.04;
+  camera.lookAt(user.position.x,0,0);
 
   renderer.render(scene,camera);
 }
 
 loop();
-
-/////////////////////////////////////////////////////
-// 📏 RESIZE
-/////////////////////////////////////////////////////
 
 addEventListener("resize",()=>{
   camera.aspect=innerWidth/innerHeight;
