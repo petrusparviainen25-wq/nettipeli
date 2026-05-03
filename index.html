@@ -162,14 +162,22 @@ function pickup(){
 function shoot(){
   if(!hasPuck()) return;
 
-  let dx=mouse.x;
   let dz=mouse.y;
 
-  let len=Math.sqrt(dx*dx+dz*dz);
-  if(len===0){dx=0;dz=-1;len=1;}
+  let pressTime = 0;
 
-  vx=(dx/len)*3.2;
-  vz=(dz/len)*3.2;
+addEventListener("mousedown", () => pressTime = Date.now());
+
+addEventListener("mouseup", () => {
+
+  const hold = Math.min(1, (Date.now() - pressTime) / 800);
+
+  const power = 2.5 + hold * 5.5; // 2.5 → 8.0
+
+  vx = (dx/len) * power;
+  vz = (dz/len) * power;
+});  vx = (dx/len) * shotPower;
+vz = (dz/len) * shotPower;
   vy=Math.max(0,-mouse.y*2);
 }
 
