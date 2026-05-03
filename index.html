@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>Jääkiekko peli</title>
+<title>Realistisempi Jääkiekko</title>
 <style>
   body {
     margin: 0;
@@ -22,8 +22,8 @@
 </head>
 <body>
 
-<h2>🏒 Jääkiekko</h2>
-<p>Liiku ← → | Lyö SPACE</p>
+<h2>🏒 Jääkiekko (Realistisempi)</h2>
+<p>← → liiku | SPACE = lyönti</p>
 <p>Pisteet: <span id="score">0</span></p>
 
 <canvas id="game" width="600" height="400"></canvas>
@@ -55,13 +55,12 @@ let goal = {
   height: 10
 };
 
-// 🧤 MAALIVAHTI
 let goalie = {
   x: 260,
   y: 20,
   width: 80,
   height: 15,
-  speed: 3
+  speed: 2.5
 };
 
 let score = 0;
@@ -71,45 +70,73 @@ document.addEventListener("keydown", e => keys[e.code] = true);
 document.addEventListener("keyup", e => keys[e.code] = false);
 
 function update() {
-  // pelaaja liike
+
+  // 🧍 pelaaja liike
   if (keys["ArrowLeft"]) player.x -= player.speed;
   if (keys["ArrowRight"]) player.x += player.speed;
   player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
 
-  // kiekko liike
+  // 🏒 kiekon liike
   puck.x += puck.vx;
   puck.y += puck.vy;
 
-  // seinät
-  if (puck.x < 0 || puck.x > canvas.width) puck.vx *= -1;
-  if (puck.y < 0 || puck.y > canvas.height) puck.vy *= -1;
+  // ⚡ kitka (hidastaa)
+  puck.vx *= 0.99;
+  puck.vy *= 0.99;
 
-  // maila osuma
+  // seinät (kulmat säilyy)
+  if (puck.x < puck.radius || puck.x > canvas.width - puck.radius) {
+    puck.vx *= -1;
+  }
+
+  if (puck.y < puck.radius || puck.y > canvas.height - puck.radius) {
+    puck.vy *= -1;
+  }
+
+  // 🏒 maila osuma (kulma riippuu osumasta)
   if (
     puck.y + puck.radius > player.y &&
     puck.x > player.x &&
     puck.x < player.x + player.width
   ) {
-    puck.vy = -Math.abs(puck.vy);
+    let hitPos = (puck.x - (player.x + player.width / 2)) / 20;
+
+    puck.vx = hitPos * 2; // kulma
+    puck.vy = -5;
   }
 
-  // 🧤 MAALIVAHTI AI (seuraa kiekkoa)
-  if (puck.x < goalie.x) goalie.x -= goalie.speed;
-  if (puck.x > goalie.x + goalie.width) goalie.x += goalie.speed;
+  // 💥 SPACE lyönti (lisävoima)
+  if (keys["Space"]) {
+    let dx = puck.x - (player.x + player.width / 2);
+    let dy = puck.y - player.y;
+    let dist = Math.sqrt(dx*dx + dy*dy);
 
-  // rajat
+    if (dist < 60) {
+      puck.vx = dx / 5;
+      puck.vy = -7;
+    }
+  }
+
+  // 🧠 maalivahti (ei täydellinen)
+  let target = puck.x - goalie.width / 2;
+
+  // pieni viive/liike-epätarkkuus
+  goalie.x += (target - goalie.x) * 0.05;
+
   goalie.x = Math.max(0, Math.min(canvas.width - goalie.width, goalie.x));
 
-  // 🧤 TORJUNTA
+  // 🧤 torjunta (kulma muuttuu)
   if (
     puck.y - puck.radius < goalie.y + goalie.height &&
     puck.x > goalie.x &&
     puck.x < goalie.x + goalie.width
   ) {
-    puck.vy = Math.abs(puck.vy); // pomppaa alas
+    let bounce = (puck.x - (goalie.x + goalie.width / 2)) / 20;
+    puck.vx = bounce * 3;
+    puck.vy = Math.abs(puck.vy);
   }
 
-  // maali (vain jos EI osu maalivahtiin)
+  // 🥅 maali
   if (
     puck.y - puck.radius <= goal.y + goal.height &&
     puck.x > goal.x &&
@@ -120,13 +147,8 @@ function update() {
 
     puck.x = 300;
     puck.y = 200;
-  }
-
-  // lyönti
-  if (keys["Space"]) {
-    if (Math.abs(puck.y - player.y) < 30) {
-      puck.vy = -6;
-    }
+    puck.vx = 2;
+    puck.vy = 2;
   }
 }
 
@@ -141,7 +163,7 @@ function draw() {
   ctx.fillStyle = "red";
   ctx.fillRect(goal.x, goal.y, goal.width, goal.height);
 
-  // 🧤 maalivahti
+  // maalivahti
   ctx.fillStyle = "purple";
   ctx.fillRect(goalie.x, goalie.y, goalie.width, goalie.height);
 
