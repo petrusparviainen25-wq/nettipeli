@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL V14 FIXED</title>
+<title>NHL V15 SAFE GOAL NET</title>
 <style>
 body { margin:0; overflow:hidden; background:#87cfff; }
 canvas { display:block; }
@@ -25,7 +25,7 @@ canvas { display:block; }
 <script>
 
 /////////////////////////////////////////////////////
-// 🌍 SAFE INIT
+// 🧠 SAFE CORE
 /////////////////////////////////////////////////////
 
 let scene, camera, renderer;
@@ -39,11 +39,10 @@ let keys={};
 let mouse={x:0,y:0};
 
 let controlled="user";
-
 let score=0;
 
 /////////////////////////////////////////////////////
-// INIT (FORCED VISIBILITY FIX)
+// INIT SAFE
 /////////////////////////////////////////////////////
 
 function init(){
@@ -58,19 +57,20 @@ renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth,innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// light
+// lights
 scene.add(new THREE.AmbientLight(0xffffff,1.2));
 
-let light = new THREE.DirectionalLight(0xffffff,1.3);
+const light = new THREE.DirectionalLight(0xffffff,1.3);
 light.position.set(10,30,10);
 scene.add(light);
 
+// world
 ice();
 boards();
-goal();
+goalNet();   // 🔥 FIXED GOAL
 players();
 puckObj();
-goal();
+
 }
 
 /////////////////////////////////////////////////////
@@ -87,82 +87,107 @@ function ice(){
 }
 
 /////////////////////////////////////////////////////
-// 🧱 BOARDS (VISIBLE ALWAYS)
+// 🧱 BOARDS (SAFE)
 /////////////////////////////////////////////////////
 
 function boards(){
 
- let m = new THREE.MeshStandardMaterial({color:0xffffff});
+ const m = new THREE.MeshStandardMaterial({color:0xffffff});
 
- let left = new THREE.Mesh(new THREE.BoxGeometry(2,3,120),m);
- let right = new THREE.Mesh(new THREE.BoxGeometry(2,3,120),m);
- let top = new THREE.Mesh(new THREE.BoxGeometry(200,3,2),m);
- let bottom = new THREE.Mesh(new THREE.BoxGeometry(200,3,2),m);
+ const a = new THREE.Mesh(new THREE.BoxGeometry(2,3,120),m);
+ const b = new THREE.Mesh(new THREE.BoxGeometry(2,3,120),m);
+ const c = new THREE.Mesh(new THREE.BoxGeometry(200,3,2),m);
+ const d = new THREE.Mesh(new THREE.BoxGeometry(200,3,2),m);
 
- left.position.set(-100,1.5,0);
- right.position.set(100,1.5,0);
- top.position.set(0,1.5,-60);
- bottom.position.set(0,1.5,60);
+ a.position.set(-100,1.5,0);
+ b.position.set(100,1.5,0);
+ c.position.set(0,1.5,-60);
+ d.position.set(0,1.5,60);
 
- scene.add(left,right,top,bottom);
+ scene.add(a,b,c,d);
 }
 
 /////////////////////////////////////////////////////
-// 🥅 GOAL (FIXED VISIBILITY + POSITION)
+// 🥅 REAL GOAL NET (FIXED + GUARANTEED VISIBILITY)
 /////////////////////////////////////////////////////
 
-function goal(){
+function goalNet(){
 
- if(!scene) return;
+ const group = new THREE.Group();
 
- // 🧹 poista vanha
- if(window._goalGroup){
-  scene.remove(window._goalGroup);
- }
-
- const g = new THREE.Group();
-
- const mat = new THREE.MeshStandardMaterial({
+ const postMat = new THREE.MeshStandardMaterial({
   color:0xff0000,
   emissive:0x330000
 });
 
- const postGeo = new THREE.BoxGeometry(1,10,1);
- const barGeo = new THREE.BoxGeometry(14,1,1);
+ const netMat = new THREE.MeshStandardMaterial({
+  color:0xffffff,
+  wireframe:true,
+  transparent:true,
+  opacity:0.7
+});
 
- const left = new THREE.Mesh(postGeo,mat);
- const right = new THREE.Mesh(postGeo,mat);
- const top = new THREE.Mesh(barGeo,mat);
+// 🥅 POSTS (PAKSUT)
+ const left = new THREE.Mesh(new THREE.BoxGeometry(1,10,1),postMat);
+ const right = new THREE.Mesh(new THREE.BoxGeometry(1,10,1),postMat);
+ const top = new THREE.Mesh(new THREE.BoxGeometry(14,1,1),postMat);
 
- // 🥅 SIJOITUS: TÄMÄ ON KRIITTINEN FIX
- const z = -30;   // 🔥 tuot maalin lähemmäs kameraa
+// 📍 TÄRKEIN FIX: SIIRRETTY LÄHEMMÄS KAMERAA
+ const z = -25;
 
  left.position.set(-6,5,z);
  right.position.set(6,5,z);
  top.position.set(0,10,z);
 
- g.add(left);
- g.add(right);
- g.add(top);
+// 🕸️ BACK NET (SYVYYS)
+ const back = new THREE.Mesh(
+  new THREE.BoxGeometry(12,8,2),
+  netMat
+ );
 
- scene.add(g);
+ back.position.set(0,4,z-2);
 
- window._goalGroup = g;
+// 🕸️ SIVUVERKKO
+ const sideL = new THREE.Mesh(
+  new THREE.BoxGeometry(1,8,2),
+  netMat
+ );
+
+ const sideR = new THREE.Mesh(
+  new THREE.BoxGeometry(1,8,2),
+  netMat
+ );
+
+ sideL.position.set(-6,4,z-1);
+ sideR.position.set(6,4,z-1);
+
+// 🧠 ADD
+ group.add(left);
+ group.add(right);
+ group.add(top);
+ group.add(back);
+ group.add(sideL);
+ group.add(sideR);
+
+ scene.add(group);
+
+ window._goal = group;
 }
+
 /////////////////////////////////////////////////////
-// 🧍 PLAYERS (FORCED VISIBILITY FIX)
+// 🧍 PLAYERS
 /////////////////////////////////////////////////////
 
 function player(color,x,z){
 
- let g = new THREE.Group();
+ const g = new THREE.Group();
 
- let body = new THREE.Mesh(
+ const body = new THREE.Mesh(
   new THREE.CylinderGeometry(0.9,1.1,3.5,10),
   new THREE.MeshStandardMaterial({color})
  );
 
- let head = new THREE.Mesh(
+ const head = new THREE.Mesh(
   new THREE.SphereGeometry(0.7,12,12),
   new THREE.MeshStandardMaterial({color:0xffe0bd})
  );
@@ -174,8 +199,8 @@ function player(color,x,z){
  g.add(head);
 
  g.position.set(x,0,z);
-
  scene.add(g);
+
  return g;
 }
 
@@ -184,11 +209,11 @@ function players(){
  team = player(0x3399ff,6,30);
  ai1 = player(0xff4444,-5,-20);
  ai2 = player(0xff7777,5,-25);
- goalie = player(0xffffff,0,-38);
+ goalie = player(0xffffff,0,-27);
 }
 
 /////////////////////////////////////////////////////
-// 🏒 PUCK (ALWAYS VISIBLE)
+// PUCK
 /////////////////////////////////////////////////////
 
 function puckObj(){
@@ -217,7 +242,7 @@ addEventListener("mousemove",e=>{
 });
 
 /////////////////////////////////////////////////////
-// ACTIVE PLAYER
+// ACTIVE
 /////////////////////////////////////////////////////
 
 function active(){
@@ -248,7 +273,7 @@ function move(){
 }
 
 /////////////////////////////////////////////////////
-// PICKUP (FIXED)
+// PICKUP
 /////////////////////////////////////////////////////
 
 function pickup(){
@@ -260,10 +285,6 @@ function pickup(){
  let dz = puck.position.z - p.position.z;
 
  if(Math.hypot(dx,dz) < 3.5){
-  controlled = controlled; // EI lukitse enää bugisti
- }
-
- if(Math.hypot(dx,dz) < 3.5){
 
   puck.position.x += (p.position.x - puck.position.x)*0.35;
   puck.position.z += (p.position.z - puck.position.z)*0.35;
@@ -272,7 +293,7 @@ function pickup(){
 }
 
 /////////////////////////////////////////////////////
-// SHOOT (FIXED — EI PUCKOWNER BLOKKAA)
+// SHOOT
 /////////////////////////////////////////////////////
 
 function shoot(){
@@ -284,24 +305,20 @@ function shoot(){
  let dz = mouse.y;
 
  let len = Math.hypot(dx,dz);
- if(len < 0.001){ dx = 0; dz = -1; len = 1; }
+ if(len < 0.001){ dx=0; dz=-1; len=1; }
 
  dx /= len;
  dz /= len;
 
  vx = dx * 5.5;
  vz = dz * 5.5;
- vy = Math.max(0, -mouse.y * 2.3);
-
- // 🧠 IMPORTANT FIX:
- // aina vapautetaan kiekko
- puckOwner = null;
+ vy = Math.max(0, -mouse.y * 2.2);
 }
 
 addEventListener("mousedown",shoot);
 
 /////////////////////////////////////////////////////
-// PASS (FIXED)
+// PASS
 /////////////////////////////////////////////////////
 
 function pass(){
@@ -321,8 +338,6 @@ function pass(){
  vx = dx * 3.8;
  vz = dz * 3.8;
  vy = 0;
-
- puckOwner = null;
 
  controlled = controlled==="user"?"team":"user";
 }
@@ -355,18 +370,17 @@ function physics(){
 }
 
 /////////////////////////////////////////////////////
-// GOAL (FIXED HITBOX)
+// GOAL (SAFE + CORRECT POSITION)
 /////////////////////////////////////////////////////
 
 function goal(){
 
  if(!puck) return;
 
- if(
-  puck.position.z < -39 &&
-  puck.position.x > -6 &&
-  puck.position.x < 6
- ){
+ // 🔥 TÄRKEÄ: sama z kuin goalNet
+ if(puck.position.z < -25 &&
+    puck.position.x > -6 &&
+    puck.position.x < 6){
 
   score++;
   document.getElementById("score").innerText = score + " - 0";
