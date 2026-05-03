@@ -28,8 +28,9 @@ canvas { display:block; }
 /////////////////////////////////////////////////////
 // 🌍 SCENE (SAFE)
 /////////////////////////////////////////////////////
-
-const scene = new THREE.Scene();
+const ai = player(0xff3333, -5, -20);
+const defender = player(0xff7777, 5, -15);
+ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87cfff);
 
 const camera = new THREE.PerspectiveCamera(
@@ -180,23 +181,33 @@ function pickup(){
 
 function shoot(){
 
-  const p=active();
+  const p = active();
 
-  let dx=mouse.x;
-  let dz=mouse.y;
+  let dx = mouse.x;
+  let dz = mouse.y;
 
-  let len=Math.sqrt(dx*dx+dz*dz);
-  if(len===0){dx=0;dz=-1;len=1;}
+  let len = Math.sqrt(dx*dx + dz*dz);
+  if(len === 0){
+    dx = 0;
+    dz = -1;
+    len = 1;
+  }
 
-  vx=(dx/len)*3;
-  vz=(dz/len)*3;
+  // 🎯 95% accuracy (very small spread)
+  const spread = 0.03;
 
-  puck.position.y=2;
-}
+  dx += (Math.random()-0.5) * spread;
+  dz += (Math.random()-0.5) * spread;
 
-addEventListener("mousedown",shoot);
+  vx = (dx/len) * 3.2;
+  vz = (dz/len) * 3.2;
 
-/////////////////////////////////////////////////////
+  // 🟢 HEIGHT SYSTEM (TÄRKEIN LISÄYS)
+  // mouse.y < 0 = ylöspäin → enemmän ilmaa
+  vy = Math.max(0, -mouse.y * 2.4);
+
+  puck.position.y = 2;
+}/////////////////////////////////////////////////////
 // PASS (WORKING SIMPLE)
 /////////////////////////////////////////////////////
 
@@ -265,8 +276,9 @@ function cameraFix(){
 /////////////////////////////////////////////////////
 // LOOP
 /////////////////////////////////////////////////////
-
-function loop(){
+ai.position.x += (puck.position.x - ai.position.x) * 0.03;
+defender.position.x += (puck.position.x - defender.position.x) * 0.03;
+  function loop(){
   requestAnimationFrame(loop);
 
   move();
