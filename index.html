@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL v4 CINEMATIC ENGINE</title>
+<title>NHL V5 FULL ENGINE</title>
 <style>
 body { margin:0; overflow:hidden; background:#000; }
 canvas { display:block; }
@@ -21,7 +21,7 @@ canvas { display:block; }
   top:50px;
   left:10px;
   color:yellow;
-  font-size:24px;
+  font-size:22px;
 }
 </style>
 </head>
@@ -41,14 +41,14 @@ canvas { display:block; }
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xaad8ff);
 
-scene.add(new THREE.AmbientLight(0xffffff,0.7));
+scene.add(new THREE.AmbientLight(0xffffff,0.75));
 
 const light = new THREE.DirectionalLight(0xffffff,1.5);
 light.position.set(10,30,10);
 scene.add(light);
 
 /////////////////////////////////////////////////////
-// 🎥 CAMERA (cinematic follow)
+// 🎥 CAMERA
 /////////////////////////////////////////////////////
 
 const camera = new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.1,1000);
@@ -70,7 +70,7 @@ ice.rotation.x = -Math.PI/2;
 scene.add(ice);
 
 /////////////////////////////////////////////////////
-// 🧱 REALISTIC BOARDS
+// 🧱 BOARDS (rebound physics)
 /////////////////////////////////////////////////////
 
 function board(x,z,w,h){
@@ -88,13 +88,12 @@ board(100,0,2,120);
 board(-100,0,2,120);
 
 /////////////////////////////////////////////////////
-// 🥅 GOAL (RED + BIG + NET FEEL)
+// 🥅 GOAL (RED + BIG)
 /////////////////////////////////////////////////////
 
-function goal(){
+function makeGoal(){
 
   const g = new THREE.Group();
-
   const red = new THREE.MeshStandardMaterial({color:0xff0000});
 
   const left = new THREE.Mesh(new THREE.BoxGeometry(0.3,4,0.3),red);
@@ -107,14 +106,12 @@ function goal(){
 
   g.add(left,right,top);
   scene.add(g);
-
-  return g;
 }
 
-goal();
+makeGoal();
 
 /////////////////////////////////////////////////////
-// 🏒 PLAYERS (TEAM SYSTEM)
+// 🏒 PLAYER SYSTEM (animation states)
 /////////////////////////////////////////////////////
 
 function player(color,z){
@@ -124,23 +121,21 @@ function player(color,z){
   );
   p.position.set(0,2,z);
 
-  p.state = "skate";
+  p.state = "idle";
   p.stamina = 1;
 
   scene.add(p);
   return p;
 }
 
-// oma joukkue
 const user = player(0x0066ff,35);
 const teammate = player(0x3399ff,25);
 
-// AI joukkue
 const ai = player(0xff3333,-35);
 const defender = player(0xff7777,-20);
 
 /////////////////////////////////////////////////////
-// 🥅 GOALIE
+// 🥅 GOALIE (dive system)
 /////////////////////////////////////////////////////
 
 const goalie = new THREE.Mesh(
@@ -184,6 +179,17 @@ let hasPuck=false;
 let score=0;
 
 /////////////////////////////////////////////////////
+// 🎞️ REPLAY BUFFER
+/////////////////////////////////////////////////////
+
+let replay=[];
+
+function saveReplay(){
+  replay.push({x:puck.position.x,z:puck.position.z});
+  if(replay.length>180) replay.shift();
+}
+
+/////////////////////////////////////////////////////
 // 🏒 PASS SYSTEM
 /////////////////////////////////////////////////////
 
@@ -191,10 +197,10 @@ function pass(){
 
   if(!hasPuck) return;
 
-  vx = (teammate.position.x - user.position.x)*0.25;
-  vz = (teammate.position.z - user.position.z)*0.25;
+  vx = (teammate.position.x - user.position.x)*0.3;
+  vz = (teammate.position.z - user.position.z)*0.3;
 
-  hasPuck = false;
+  hasPuck=false;
 }
 
 addEventListener("keydown",e=>{
@@ -202,7 +208,7 @@ addEventListener("keydown",e=>{
 });
 
 /////////////////////////////////////////////////////
-// 🏒 SHOOT (REAL STICK RELEASE FIX)
+// 🏒 SHOOT (REAL STICK RELEASE)
 /////////////////////////////////////////////////////
 
 addEventListener("mousedown",()=>{
@@ -214,45 +220,51 @@ addEventListener("mousedown",()=>{
 
   const len = Math.sqrt(dx*dx+dz*dz);
 
-  vx = (dx/len)*1.8;
-  vz = (dz/len)*1.8;
+  vx = (dx/len)*2.2;
+  vz = (dz/len)*2.2;
 
-  hasPuck = false; // 👉 TÄRKEÄ: aina irtoaa lavasta
+  hasPuck=false;
 });
 
 /////////////////////////////////////////////////////
-// 🤖 AI FORMATION (2-1-2 style)
+// 🤖 AI FORMATION
 /////////////////////////////////////////////////////
 
 function aiBrain(){
 
   // puolustus
   if(puck.position.z < 15){
-    defender.position.x += (puck.position.x - defender.position.x)*0.05;
+    defender.position.x += (puck.position.x - defender.position.x)*0.06;
   }
 
   // hyökkäys
-  ai.position.x += (puck.position.x - ai.position.x)*0.04;
+  ai.position.x += (puck.position.x - ai.position.x)*0.05;
   ai.position.z += (puck.position.z - ai.position.z)*0.03;
 }
 
 /////////////////////////////////////////////////////
-// 🥅 GOALIE AI (dive logic base)
+// 🥅 GOALIE DIVE LOGIC
 /////////////////////////////////////////////////////
 
 function goalieAI(){
 
-  const predict = puck.position.x + vx*5;
+  const predict = puck.position.x + vx*6;
 
   goalie.position.x += (predict - goalie.position.x)*0.12;
-  goalie.position.x = Math.max(-6,Math.min(6,goalie.position.x));
+
+  // “dive trigger”
+  if(Math.abs(predict - goalie.position.x) > 4){
+    goalie.position.y = 1.5; // simuloitu dive
+  } else {
+    goalie.position.y = 2;
+  }
 }
 
 /////////////////////////////////////////////////////
-// 🧊 PUCK PHYSICS
+// 🧊 PHYSICS
 /////////////////////////////////////////////////////
 
-function puckPhysics(){
+function physics(){
 
   if(hasPuck){
     puck.position.x = user.position.x;
@@ -267,10 +279,26 @@ function puckPhysics(){
 }
 
 /////////////////////////////////////////////////////
-// 🥅 GOAL CHECK (REAL)
+// 🧱 BOARDS COLLISION
 /////////////////////////////////////////////////////
 
-function goalCheck(){
+function boards(){
+
+  if(puck.position.x > 98 || puck.position.x < -98){
+    vx *= -0.7;
+  }
+
+  if(puck.position.z > 58 || puck.position.z < -58){
+    vz *= -0.7;
+  }
+}
+
+/////////////////////////////////////////////////////
+// 🥅 GOAL CHECK
+/////////////////////////////////////////////////////
+
+function goal(){
+
   return (
     puck.position.z < -40 &&
     puck.position.x > -3.7 &&
@@ -283,6 +311,7 @@ function goalCheck(){
 /////////////////////////////////////////////////////
 
 function reset(){
+
   puck.position.set(0,1,0);
   vx=0;vz=0;
   hasPuck=false;
@@ -298,8 +327,10 @@ function loop(){
 
   requestAnimationFrame(loop);
 
+  saveReplay();
+
   /////////////////////////////////////////////////////
-  // PLAYER MOVEMENT
+  // PLAYER MOVE + STAMINA
   /////////////////////////////////////////////////////
 
   let speed = 0.9 * user.stamina;
@@ -308,6 +339,9 @@ function loop(){
   if(keys["KeyD"]) user.position.x += speed;
   if(keys["KeyW"]) user.position.z -= speed;
   if(keys["KeyS"]) user.position.z += speed;
+
+  user.stamina *= 0.995;
+  user.stamina = Math.min(1,user.stamina+0.002);
 
   /////////////////////////////////////////////////////
   // PUCK CONTROL
@@ -319,10 +353,11 @@ function loop(){
 
   if(dist < 3.5) hasPuck = true;
 
-  puckPhysics();
+  physics();
+  boards();
 
   /////////////////////////////////////////////////////
-  // AI
+  // AI + GOALIE
   /////////////////////////////////////////////////////
 
   aiBrain();
@@ -332,7 +367,7 @@ function loop(){
   // GOAL
   /////////////////////////////////////////////////////
 
-  if(goalCheck()){
+  if(goal()){
 
     score++;
 
@@ -341,15 +376,13 @@ function loop(){
 
     document.getElementById("msg").innerText="GOAL!";
 
-    setTimeout(()=>{
-      document.getElementById("msg").innerText="";
-    },900);
+    setTimeout(()=>document.getElementById("msg").innerText="",900);
 
     reset();
   }
 
   /////////////////////////////////////////////////////
-  // CAMERA (cinematic follow)
+  // CAMERA
   /////////////////////////////////////////////////////
 
   camera.position.x += (user.position.x - camera.position.x)*0.04;
