@@ -183,26 +183,39 @@ function pickup(){
 /////////////////////////////////////////////////////
 
 function shoot(){
-  if(owner!==controlled) return;
 
-  let dx=mouse.x;
-  let dz=mouse.y;
+  if(owner !== controlled) return;
+  if(lock) return;
 
-  let len=Math.sqrt(dx*dx+dz*dz);
-  if(len===0) return;
+  lock = true;
 
-  vx=(dx/len)*3.2;
-  vz=(dz/len)*3.2;
+  // 🎯 direction based on mouse
+  let dx = mouse.x;
+  let dz = mouse.y;
 
-  // 🎯 height control
-  vy=Math.max(0,-mouse.y*1.8);
+  let len = Math.sqrt(dx*dx + dz*dz);
+  if(len === 0){ lock = false; return; }
 
-  owner="free";
-}
+  // 🎯 94% accuracy (small controlled error)
+  const accuracy = 0.94;
+  const error = (1 - accuracy);
 
-addEventListener("mousedown",shoot);
+  dx += (Math.random() - 0.5) * error * 0.8;
+  dz += (Math.random() - 0.5) * error * 0.8;
 
-/////////////////////////////////////////////////////
+  // 🏒 shot power
+  const power = 3.2;
+
+  vx = (dx / len) * power;
+  vz = (dz / len) * power;
+
+  // 🟢 height from aim (no physics break)
+  vy = Math.max(0, -mouse.y * 1.6);
+
+  owner = "free";
+
+  setTimeout(() => lock = false, 80);
+}/////////////////////////////////////////////////////
 // 🤝 PASS
 /////////////////////////////////////////////////////
 
