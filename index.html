@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL</title>
+<title>3D NHL FINAL</title>
 <style>
 body { margin:0; overflow:hidden; background:black; }
 canvas { display:block; }
@@ -13,29 +13,26 @@ canvas { display:block; }
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
 <script>
+
 // ================= SCENE =================
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xaadfff);
 
-// 🎥 CAMERA (NHL-kulma)
+// CAMERA
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-camera.position.set(0, 35, 55);
+camera.position.set(0,35,55);
 camera.lookAt(0,0,0);
 
-// 🖥 RENDERER
+// RENDERER
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// 💡 LIGHTING (TÄRKEÄ)
-const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(10,30,10);
-scene.add(light);
+// LIGHT
+scene.add(new THREE.DirectionalLight(0xffffff,1).position.set(10,30,10));
+scene.add(new THREE.AmbientLight(0x666666));
 
-const ambient = new THREE.AmbientLight(0x666666);
-scene.add(ambient);
-
-// 🧊 ICE
+// ================= ICE =================
 const ice = new THREE.Mesh(
   new THREE.PlaneGeometry(120,80),
   new THREE.MeshStandardMaterial({color:0xe6f7ff})
@@ -46,7 +43,7 @@ scene.add(ice);
 // ================= PLAYER =================
 const player = new THREE.Group();
 
-const playerBody = new THREE.Mesh(
+const body = new THREE.Mesh(
   new THREE.CapsuleGeometry(1.2,2,4,8),
   new THREE.MeshStandardMaterial({color:0x0055ff})
 );
@@ -57,7 +54,7 @@ const stick = new THREE.Mesh(
 );
 stick.position.z = -2;
 
-player.add(playerBody);
+player.add(body);
 player.add(stick);
 player.position.set(0,2,30);
 scene.add(player);
@@ -82,7 +79,7 @@ scene.add(goal);
 // ================= GOALIE =================
 const goalie = new THREE.Group();
 
-const goalieBody = new THREE.Mesh(
+const gBody = new THREE.Mesh(
   new THREE.CapsuleGeometry(1.5,2.5,4,8),
   new THREE.MeshStandardMaterial({color:0xffffff})
 );
@@ -93,7 +90,7 @@ const pads = new THREE.Mesh(
 );
 pads.position.y = -1.5;
 
-goalie.add(goalieBody);
+goalie.add(gBody);
 goalie.add(pads);
 goalie.position.set(0,2,-32);
 scene.add(goalie);
@@ -114,23 +111,25 @@ window.addEventListener("mousemove",(e)=>{
 
 // ================= PHYSICS =================
 let vx = 0, vz = 0;
-let score = 0;
+let hasPuck = false;
 
-// max speed fix
-const MAX_SPEED = 1.2;
-
+// clamp
 function clampSpeed(){
   let s = Math.sqrt(vx*vx + vz*vz);
-  if(s > MAX_SPEED){
-    vx = (vx/s)*MAX_SPEED;
-    vz = (vz/s)*MAX_SPEED;
+  if(s > 1.4){
+    vx = (vx/s)*1.4;
+    vz = (vz/s)*1.4;
   }
 }
 
 // ================= SHOOT =================
 window.addEventListener("mousedown",()=>{
-  vx = (aim.x - puck.position.x) * 0.25;
-  vz = (aim.z - puck.position.z) * 0.25;
+
+  if(hasPuck){
+    vx = (aim.x - player.position.x) * 0.25;
+    vz = (aim.z - player.position.z) * 0.25;
+    hasPuck = false;
+  }
 });
 
 // ================= LOOP =================
@@ -138,7 +137,7 @@ function animate(){
 
   requestAnimationFrame(animate);
 
-  // 🧍‍♂️ player move
+  // 🧍‍♂️ player movement
   if(keys["KeyA"]) player.position.x -= 0.7;
   if(keys["KeyD"]) player.position.x += 0.7;
   if(keys["KeyW"]) player.position.z -= 0.7;
@@ -147,7 +146,7 @@ function animate(){
   player.position.x = Math.max(-55,Math.min(55,player.position.x));
   player.position.z = Math.max(-35,Math.min(35,player.position.z));
 
-  // 🎯 aim system
+  // 🎯 aim
   aim.x = player.position.x + mouse.x * 15;
   aim.z = player.position.z - 20 + mouse.y * 15;
 
@@ -160,32 +159,36 @@ function animate(){
 
   clampSpeed();
 
-  // 🧍‍♂️ puck control
+  // 🏒 puck stick control (GLUE SYSTEM)
   let dx = puck.position.x - player.position.x;
   let dz = puck.position.z - player.position.z;
   let dist = Math.sqrt(dx*dx + dz*dz);
 
-  if(dist < 4){
-    vx += dx * 0.03;
-    vz += dz * 0.03;
+  if(dist < 4 && !hasPuck){
+    hasPuck = true;
+  }
+
+  if(hasPuck){
+    puck.position.x = player.position.x;
+    puck.position.z = player.position.z - 2;
+    vx = 0;
+    vz = 0;
   }
 
   // 🥅 goalie AI
   goalie.position.x += (puck.position.x - goalie.position.x) * 0.05;
 
-  // 🧤 block shot
+  // 🧤 save
   if(puck.position.z < -30 &&
      Math.abs(puck.position.x - goalie.position.x) < 3){
     vz *= -0.6;
   }
 
-  // 🥅 goal
+  // 🥅 goal reset
   if(puck.position.z < -35){
-    score++;
-    console.log("GOAL:",score);
-
     puck.position.set(0,1,10);
     vx = 0; vz = 0;
+    hasPuck = false;
   }
 
   renderer.render(scene,camera);
@@ -197,8 +200,9 @@ animate();
 window.addEventListener("resize",()=>{
   camera.aspect = window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 </script>
 
 </body>
