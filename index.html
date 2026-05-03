@@ -177,32 +177,40 @@ function pickup(){
 // 🏒 SHOOT (POWER SYSTEM)
 /////////////////////////////////////////////////////
 
-addEventListener("mousedown",()=>pressTime=Date.now());
-
-addEventListener("mouseup",()=>{
+function shoot(){
 
   if(!hasPuck()) return;
 
-  const p=active();
+  const p = active();
 
-  let dx=mouse.x;
-  let dz=mouse.y;
+  let dx = mouse.x;
+  let dz = mouse.y;
 
-  let len=Math.sqrt(dx*dx+dz*dz);
-  if(len===0){dx=0;dz=-1;len=1;}
+  let len = Math.sqrt(dx*dx + dz*dz);
+  if(len === 0){
+    dx = 0;
+    dz = -1;
+    len = 1;
+  }
 
-  // 🟢 POWER CALC (hold time)
-  const hold = Math.min(1,(Date.now()-pressTime)/800);
+  // 🎯 pieni NHL-tason hajonta (ei arcade spread)
+  const accuracy = 0.02;
 
-  const power = 2.5 + hold*5.5; // 2.5 → 8.0
+  dx += (Math.random()-0.5) * accuracy;
+  dz += (Math.random()-0.5) * accuracy;
 
-  vx=(dx/len)*power;
-  vz=(dz/len)*power;
+  // 🏒 SUORA VELOCITY (EI pomppua)
+  const basePower = 4.2;
 
-  vy=Math.max(0,-mouse.y*2.4);
+  vx = (dx / len) * basePower;
+  vz = (dz / len) * basePower;
 
-});
+  // 🧊 TÄRKEÄ FIX: poistetaan “hyppy”
+  vy = 0;
 
+  // puck pysyy jäässä laukauksen alussa
+  puck.position.y = 1;
+}
 /////////////////////////////////////////////////////
 // PASS
 /////////////////////////////////////////////////////
