@@ -113,19 +113,48 @@ function boards(){
 
 function goal(){
 
- let mat = new THREE.MeshStandardMaterial({color:0xff0000});
+ if(!scene) return;
 
- let l = new THREE.Mesh(new THREE.BoxGeometry(0.5,10,0.5),mat);
- let r = new THREE.Mesh(new THREE.BoxGeometry(0.5,10,0.5),mat);
- let t = new THREE.Mesh(new THREE.BoxGeometry(12,0.5,0.5),mat);
+ // 🧱 poistetaan vanha maali jos sellainen on (varmuus)
+ if(window._goalGroup){
+   scene.remove(window._goalGroup);
+ }
 
- l.position.set(-6,5,-40);
- r.position.set(6,5,-40);
- t.position.set(0,10,-40);
+ const g = new THREE.Group();
 
- scene.add(l,r,t);
+ const mat = new THREE.MeshStandardMaterial({
+  color:0xff0000,
+  emissive:0x220000
+});
+
+ // 🥅 tolpat (paksummat = näkyy varmasti)
+ const left = new THREE.Mesh(
+  new THREE.BoxGeometry(1,10,1),
+  mat
+ );
+
+ const right = new THREE.Mesh(
+  new THREE.BoxGeometry(1,10,1),
+  mat
+ );
+
+ const top = new THREE.Mesh(
+  new THREE.BoxGeometry(14,1,1),
+  mat
+ );
+
+ left.position.set(-6,5,-40);
+ right.position.set(6,5,-40);
+ top.position.set(0,10,-40);
+
+ g.add(left);
+ g.add(right);
+ g.add(top);
+
+ scene.add(g);
+
+ window._goalGroup = g;
 }
-
 /////////////////////////////////////////////////////
 // 🧍 PLAYERS (FORCED VISIBILITY FIX)
 /////////////////////////////////////////////////////
