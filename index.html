@@ -2,13 +2,24 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL SAFE V2 FINAL</title>
+<title>NHL V3 FULL</title>
 <style>
 body { margin:0; overflow:hidden; }
 canvas { display:block; }
+
+#score {
+position:absolute;
+top:10px;
+left:10px;
+color:white;
+font-family:Arial;
+font-size:24px;
+}
 </style>
 </head>
 <body>
+
+<div id="score">0 - 0</div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
@@ -25,7 +36,6 @@ const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// ===== LIGHT =====
 scene.add(new THREE.AmbientLight(0xffffff,1.2));
 const light = new THREE.DirectionalLight(0xffffff,1.5);
 light.position.set(10,30,10);
@@ -62,13 +72,13 @@ function goal(){
   const g=new THREE.Group();
   const m=new THREE.MeshStandardMaterial({color:0xff0000});
 
-  const l=new THREE.Mesh(new THREE.BoxGeometry(0.5,8,0.5),m);
-  const r=new THREE.Mesh(new THREE.BoxGeometry(0.5,8,0.5),m);
-  const t=new THREE.Mesh(new THREE.BoxGeometry(12,0.5,0.5),m);
+  const l=new THREE.Mesh(new THREE.BoxGeometry(0.5,10,0.5),m);
+  const r=new THREE.Mesh(new THREE.BoxGeometry(0.5,10,0.5),m);
+  const t=new THREE.Mesh(new THREE.BoxGeometry(14,0.5,0.5),m);
 
-  l.position.set(-6,4,-40);
-  r.position.set(6,4,-40);
-  t.position.set(0,8,-40);
+  l.position.set(-7,5,-40);
+  r.position.set(7,5,-40);
+  t.position.set(0,10,-40);
 
   g.add(l,r,t);
   scene.add(g);
@@ -88,16 +98,6 @@ function player(c,x,z){
 
 const user=player(0x0066ff,0,30);
 const team=player(0x3399ff,6,30);
-const ai1=player(0xff3333,-5,-20);
-const ai2=player(0xff7777,5,-15);
-
-// ===== GOALIE =====
-const goalie=new THREE.Mesh(
-  new THREE.CapsuleGeometry(1.6,2.5,6,10),
-  new THREE.MeshStandardMaterial({color:0xffffff})
-);
-goalie.position.set(0,2,-38);
-scene.add(goalie);
 
 // ===== PUCK =====
 const puck=new THREE.Mesh(
@@ -113,8 +113,9 @@ let vx=0,vz=0,vy=0;
 let mouse={x:0,y:0};
 let keys={};
 let controlled="user";
-let pressTime=0;
-let stamina=100;
+
+let velX=0, velZ=0; // momentum
+let scoreUser=0;
 
 // ===== INPUT =====
 addEventListener("keydown",e=>keys[e.code]=true);
@@ -125,20 +126,27 @@ addEventListener("mousemove",e=>{
   mouse.y=(e.clientY/innerHeight-0.5)*2;
 });
 
-addEventListener("mousedown",()=>pressTime=Date.now());
-
 // ===== ACTIVE =====
 function active(){
   return controlled==="user"?user:team;
 }
 
-// ===== MOVE =====
+// ===== MOMENTUM MOVE =====
 function move(){
   const p=active();
-  if(keys["KeyA"])p.position.x-=0.8;
-  if(keys["KeyD"])p.position.x+=0.8;
-  if(keys["KeyW"])p.position.z-=0.8;
-  if(keys["KeyS"])p.position.z+=0.8;
+
+  let acc=0.15;
+
+  if(keys["KeyA"]) velX-=acc;
+  if(keys["KeyD"]) velX+=acc;
+  if(keys["KeyW"]) velZ-=acc;
+  if(keys["KeyS"]) velZ+=acc;
+
+  velX*=0.9;
+  velZ*=0.9;
+
+  p.position.x+=velX;
+  p.position.z+=velZ;
 }
 
 // ===== PUCK =====
@@ -146,7 +154,7 @@ function hasPuck(){
   const p=active();
   let dx=puck.position.x-p.position.x;
   let dz=puck.position.z-p.position.z;
-  return Math.sqrt(dx*dx+dz*dz)<3.5;
+  return Math.sqrt(dx*dx+dz*dz)<3;
 }
 
 function pickup(){
@@ -156,8 +164,8 @@ function pickup(){
   puck.position.z=p.position.z-2;
 }
 
-// ===== SHOOT SYSTEM =====
-addEventListener("mouseup",()=>{
+// ===== SHOOT (HIGH SHOT FIXED) =====
+addEventListener("mousedown",()=>{
 
   if(!hasPuck()) return;
 
@@ -167,70 +175,56 @@ addEventListener("mouseup",()=>{
   let len=Math.sqrt(dx*dx+dz*dz);
   if(len===0){dx=0;dz=-1;len=1;}
 
-  const hold=Math.min(1,(Date.now()-pressTime)/800);
+  const power=5;
 
-  let power=3.5;
-  if(hold>0.7) power=7;        // slap
-  else if(hold>0.3) power=5;   // snap
+  vx=(dx/len)*power;
+  vz=(dz/len)*power;
 
-  const staminaFactor=0.5+(stamina/100)*0.8;
+  // 🎯 KORKEA LAUKAUS (smooth, EI pomppua)
+  const lift = Math.max(0, -mouse.y);
+  vy = lift * 2;
 
-  vx=(dx/len)*power*staminaFactor;
-  vz=(dz/len)*power*staminaFactor;
-
-  vy=0;
-
-  stamina-=hold>0.7?15:8;
-  stamina=Math.max(0,stamina);
 });
 
-// ===== PASS =====
+// ===== ONE TIMER =====
 addEventListener("keydown",e=>{
   if(e.code==="Space"){
-    const t=controlled==="user"?team:user;
+
+    const t = controlled==="user"?team:user;
 
     let dx=t.position.x-active().position.x;
     let dz=t.position.z-active().position.z;
-
     let len=Math.sqrt(dx*dx+dz*dz);
 
-    vx=(dx/len)*2.5;
-    vz=(dz/len)*2.5;
+    vx=(dx/len)*4;
+    vz=(dz/len)*4;
 
-    controlled=controlled==="user"?"team":"user";
+    // 🟢 one-timer trigger
+    if(hasPuck()){
+      vx*=1.5;
+      vz*=1.5;
+    }
+
+    controlled = controlled==="user"?"team":"user";
   }
 });
 
 // ===== BOARDS =====
-function boardPhysics(){
+function boards(){
   if(puck.position.x<-98){puck.position.x=-98;vx*=-0.6;}
   if(puck.position.x>98){puck.position.x=98;vx*=-0.6;}
   if(puck.position.z<-58){puck.position.z=-58;vz*=-0.6;}
   if(puck.position.z>58){puck.position.z=58;vz*=-0.6;}
 }
 
-// ===== GOALIE AI =====
-function goalieAI(){
-  const target = puck.position.x + vx*8;
-  goalie.position.x += (target-goalie.position.x)*0.08;
-}
+// ===== GOAL =====
+function checkGoal(){
+  if(puck.position.z<-40 && puck.position.x>-7 && puck.position.x<7){
+    scoreUser++;
+    document.getElementById("score").innerText = scoreUser + " - 0";
 
-// ===== SAVE + REBOUND =====
-function goalieSave(){
-
-  let dx=puck.position.x-goalie.position.x;
-  let dz=puck.position.z-goalie.position.z;
-
-  let d=Math.sqrt(dx*dx+dz*dz);
-
-  if(puck.position.z<-34 && d<3){
-
-    vx*=-0.4;
-    vz*=0.3;
-
-    // rebound (hallittu, ei bugi)
-    vy = 1.5;
-
+    puck.position.set(0,1,0);
+    vx=vz=vy=0;
   }
 }
 
@@ -251,12 +245,8 @@ function physics(){
   vx*=0.96;
   vz*=0.96;
 
-  boardPhysics();
-  goalieAI();
-  goalieSave();
-
-  stamina+=0.1;
-  stamina=Math.min(100,stamina);
+  boards();
+  checkGoal();
 }
 
 // ===== CAMERA =====
