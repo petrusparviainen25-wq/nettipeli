@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL SHOT V2 FULL</title>
+<title>NHL V2 GOALIE AI FULL</title>
 <style>
 body { margin:0; overflow:hidden; }
 canvas { display:block; }
@@ -50,7 +50,7 @@ scene.add(ice);
 // 🥅 GOAL
 /////////////////////////////////////////////////////
 
-function goal(){
+function makeGoal(){
   const g=new THREE.Group();
   const m=new THREE.MeshStandardMaterial({color:0xff0000});
 
@@ -65,7 +65,7 @@ function goal(){
   g.add(l,r,t);
   scene.add(g);
 }
-goal();
+makeGoal();
 
 /////////////////////////////////////////////////////
 // 🧍 PLAYERS
@@ -123,6 +123,9 @@ let controlled="user";
 let stamina=100;
 let pressTime=0;
 
+let goalieTargetX=0;
+let goalieReaction=0.12;
+
 /////////////////////////////////////////////////////
 // INPUT
 /////////////////////////////////////////////////////
@@ -151,6 +154,7 @@ function active(){
 
 function move(){
   const p=active();
+
   if(keys["KeyA"])p.position.x-=0.8;
   if(keys["KeyD"])p.position.x+=0.8;
   if(keys["KeyW"])p.position.z-=0.8;
@@ -158,7 +162,7 @@ function move(){
 }
 
 /////////////////////////////////////////////////////
-// PUCK CHECK
+// PUCK PICKUP
 /////////////////////////////////////////////////////
 
 function hasPuck(){
@@ -170,22 +174,20 @@ function hasPuck(){
 
 function pickup(){
   if(!hasPuck()) return;
-  const p=active();
 
+  const p=active();
   puck.position.x=p.position.x;
   puck.position.z=p.position.z-2;
   puck.position.y=1;
 }
 
 /////////////////////////////////////////////////////
-// 🏒 SHOOT V2
+// 🏒 SHOOT SYSTEM V2
 /////////////////////////////////////////////////////
 
 addEventListener("mouseup",()=>{
 
   if(!hasPuck()) return;
-
-  const p=active();
 
   let dx=mouse.x;
   let dz=mouse.y;
@@ -193,14 +195,12 @@ addEventListener("mouseup",()=>{
   let len=Math.sqrt(dx*dx+dz*dz);
   if(len===0){dx=0;dz=-1;len=1;}
 
-  // 🧠 shot type
   const hold=Math.min(1,(Date.now()-pressTime)/900);
 
   let type="wrist";
   if(hold>0.7) type="slap";
   else if(hold>0.3) type="snap";
 
-  // 🫁 stamina factor
   const staminaFactor=0.6+(stamina/100)*0.8;
 
   let power=0;
@@ -246,7 +246,58 @@ addEventListener("keydown",e=>{
 });
 
 /////////////////////////////////////////////////////
-// BLOCK SYSTEM
+// 🥅 GOALIE AI v2
+/////////////////////////////////////////////////////
+
+function goalieAI(){
+
+  const predictX = puck.position.x + vx * 10;
+
+  goalieTargetX = Math.max(-6, Math.min(6, predictX));
+
+  goalie.position.x += (goalieTargetX - goalie.position.x) * goalieReaction;
+}
+
+/////////////////////////////////////////////////////
+// 🧤 SAVE + DIVE
+/////////////////////////////////////////////////////
+
+function goalieSave(){
+
+  const dx = puck.position.x - goalie.position.x;
+  const dz = puck.position.z - goalie.position.z;
+
+  const dist = Math.sqrt(dx*dx+dz*dz);
+
+  const inZone = puck.position.z < -34;
+
+  if(!inZone) return;
+
+  const angle = Math.abs(dx);
+  const chance = 1 - (angle / 6);
+
+  if(dist < 3.0 && Math.random() < chance){
+
+    vx *= -0.35;
+    vz *= 0.25;
+    vy = 1.8 + Math.random()*1.2;
+
+    return;
+  }
+
+  if(dist < 5.5 && Math.random() < 0.25){
+
+    goalie.position.x += (dx>0?1:-1)*1.8;
+
+    vx *= -0.2;
+    vz *= 0.2;
+
+    vy = 2.5;
+  }
+}
+
+/////////////////////////////////////////////////////
+// 🧱 BLOCK SYSTEM
 /////////////////////////////////////////////////////
 
 function block(p){
@@ -254,9 +305,9 @@ function block(p){
   let dx=puck.position.x-p.position.x;
   let dz=puck.position.z-p.position.z;
 
-  let dist=Math.sqrt(dx*dx+dz*dz);
+  let d=Math.sqrt(dx*dx+dz*dz);
 
-  if(dist<2.2){
+  if(d<2.2){
     vx*=0.4;
     vz*=0.4;
 
@@ -285,14 +336,12 @@ function physics(){
   vx*=0.96;
   vz*=0.96;
 
-  // goalie move
-  goalie.position.x+=(puck.position.x-goalie.position.x)*0.06;
-  goalie.position.x=Math.max(-6,Math.min(6,goalie.position.x));
+  goalieAI();
+  goalieSave();
 
-  // goalie block
-  block(goalie);
   block(ai1);
   block(ai2);
+  block(goalie);
 
   stamina+=0.12;
   stamina=Math.min(100,stamina);
