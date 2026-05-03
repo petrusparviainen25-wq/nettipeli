@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL FULL GOALIE</title>
+<title>NHL SHOT POWER FULL</title>
 <style>
 body { margin:0; overflow:hidden; }
 canvas { display:block; }
@@ -14,6 +14,10 @@ canvas { display:block; }
 
 <script>
 
+/////////////////////////////////////////////////////
+// 🌍 WORLD
+/////////////////////////////////////////////////////
+
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87cfff);
 
@@ -22,7 +26,7 @@ camera.position.set(0,25,60);
 camera.lookAt(0,0,0);
 
 const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(innerWidth,innerHeight);
+renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
 scene.add(new THREE.AmbientLight(0xffffff,1.2));
@@ -30,6 +34,10 @@ scene.add(new THREE.AmbientLight(0xffffff,1.2));
 const light = new THREE.DirectionalLight(0xffffff,1.5);
 light.position.set(10,30,10);
 scene.add(light);
+
+/////////////////////////////////////////////////////
+// 🧊 ICE
+/////////////////////////////////////////////////////
 
 const ice = new THREE.Mesh(
   new THREE.PlaneGeometry(200,120),
@@ -39,27 +47,22 @@ ice.rotation.x = -Math.PI/2;
 scene.add(ice);
 
 /////////////////////////////////////////////////////
-// 🥅 GOAL (REAL)
+// 🥅 GOAL
 /////////////////////////////////////////////////////
 
-function makeGoal(){
-  const g = new THREE.Group();
-  const m = new THREE.MeshStandardMaterial({color:0xff0000});
+const goal = new THREE.Group();
+const mat = new THREE.MeshStandardMaterial({color:0xff0000});
 
-  const left = new THREE.Mesh(new THREE.BoxGeometry(0.5,8,0.5),m);
-  const right = new THREE.Mesh(new THREE.BoxGeometry(0.5,8,0.5),m);
-  const top = new THREE.Mesh(new THREE.BoxGeometry(12,0.5,0.5),m);
-  const back = new THREE.Mesh(new THREE.BoxGeometry(12,8,0.5),m);
+const l = new THREE.Mesh(new THREE.BoxGeometry(0.5,8,0.5),mat);
+const r = new THREE.Mesh(new THREE.BoxGeometry(0.5,8,0.5),mat);
+const t = new THREE.Mesh(new THREE.BoxGeometry(12,0.5,0.5),mat);
 
-  left.position.set(-6,4,-40);
-  right.position.set(6,4,-40);
-  top.position.set(0,8,-40);
-  back.position.set(0,4,-44);
+l.position.set(-6,4,-40);
+r.position.set(6,4,-40);
+t.position.set(0,8,-40);
 
-  g.add(left,right,top,back);
-  scene.add(g);
-}
-makeGoal();
+goal.add(l,r,t);
+scene.add(goal);
 
 /////////////////////////////////////////////////////
 // 🧍 PLAYERS
@@ -77,6 +80,7 @@ function player(c,x,z){
 
 const user = player(0x0066ff,0,30);
 const team = player(0x3399ff,6,30);
+
 const ai1 = player(0xff3333,-5,-20);
 const ai2 = player(0xff7777,5,-15);
 
@@ -104,13 +108,21 @@ puck.position.set(0,1,0);
 scene.add(puck);
 
 /////////////////////////////////////////////////////
-// STATE
+// 🧠 STATE
 /////////////////////////////////////////////////////
 
-let controlled="user";
 let vx=0,vz=0,vy=0;
+
 let mouse={x:0,y:0};
 let keys={};
+
+let controlled="user";
+
+let pressTime=0;
+
+/////////////////////////////////////////////////////
+// INPUT
+/////////////////////////////////////////////////////
 
 addEventListener("keydown",e=>keys[e.code]=true);
 addEventListener("keyup",e=>keys[e.code]=false);
@@ -119,6 +131,10 @@ addEventListener("mousemove",e=>{
   mouse.x=(e.clientX/innerWidth-0.5)*2;
   mouse.y=(e.clientY/innerHeight-0.5)*2;
 });
+
+/////////////////////////////////////////////////////
+// ACTIVE PLAYER
+/////////////////////////////////////////////////////
 
 function active(){
   return controlled==="user"?user:team;
@@ -130,6 +146,7 @@ function active(){
 
 function move(){
   const p=active();
+
   if(keys["KeyA"])p.position.x-=0.8;
   if(keys["KeyD"])p.position.x+=0.8;
   if(keys["KeyW"])p.position.z-=0.8;
@@ -137,7 +154,7 @@ function move(){
 }
 
 /////////////////////////////////////////////////////
-// PICKUP
+// PUCK CHECK
 /////////////////////////////////////////////////////
 
 function hasPuck(){
@@ -150,47 +167,51 @@ function hasPuck(){
 function pickup(){
   if(!hasPuck()) return;
   const p=active();
+
   puck.position.x=p.position.x;
   puck.position.z=p.position.z-2;
   puck.position.y=1;
 }
 
 /////////////////////////////////////////////////////
-// SHOOT
+// 🏒 SHOOT (POWER SYSTEM)
 /////////////////////////////////////////////////////
 
-function shoot(){
+addEventListener("mousedown",()=>pressTime=Date.now());
+
+addEventListener("mouseup",()=>{
+
   if(!hasPuck()) return;
 
+  const p=active();
+
+  let dx=mouse.x;
   let dz=mouse.y;
 
-  let pressTime = 0;
+  let len=Math.sqrt(dx*dx+dz*dz);
+  if(len===0){dx=0;dz=-1;len=1;}
 
-addEventListener("mousedown", () => pressTime = Date.now());
+  // 🟢 POWER CALC (hold time)
+  const hold = Math.min(1,(Date.now()-pressTime)/800);
 
-addEventListener("mouseup", () => {
+  const power = 2.5 + hold*5.5; // 2.5 → 8.0
 
-  const hold = Math.min(1, (Date.now() - pressTime) / 800);
+  vx=(dx/len)*power;
+  vz=(dz/len)*power;
 
-  const power = 2.5 + hold * 5.5; // 2.5 → 8.0
+  vy=Math.max(0,-mouse.y*2.4);
 
-  vx = (dx/len) * power;
-  vz = (dz/len) * power;
-});  vx = (dx/len) * shotPower;
-vz = (dz/len) * shotPower;
-  vy=Math.max(0,-mouse.y*2);
-}
-
-addEventListener("mousedown",shoot);
+});
 
 /////////////////////////////////////////////////////
 // PASS
 /////////////////////////////////////////////////////
 
 function pass(){
+
   if(!hasPuck()) return;
 
-  const t=controlled==="user"?team:user;
+  const t = controlled==="user"?team:user;
 
   let dx=t.position.x-active().position.x;
   let dz=t.position.z-active().position.z;
@@ -201,7 +222,7 @@ function pass(){
   vz=(dz/len)*2.5;
   vy=0;
 
-  controlled=controlled==="user"?"team":"user";
+  controlled = controlled==="user"?"team":"user";
 }
 
 addEventListener("keydown",e=>{
@@ -228,21 +249,17 @@ function physics(){
   vx*=0.96;
   vz*=0.96;
 
-  /////////////////////////////////////////////////////
-  // 🥅 GOALIE SAVE LOGIC
-  /////////////////////////////////////////////////////
-
+  // 🥅 goalie movement + block
   goalie.position.x += (puck.position.x - goalie.position.x)*0.06;
   goalie.position.x = Math.max(-6,Math.min(6,goalie.position.x));
 
-  // block attempt
   if(
     puck.position.z<-37 &&
-    Math.abs(puck.position.x-goalie.position.x)<2.5
+    Math.abs(puck.position.x-goalie.position.x)<2.3
   ){
-    vx *= -0.3;
-    vz *= 0.3;
-    vy = 2;
+    vx*=-0.3;
+    vz*=0.3;
+    vy=2;
   }
 }
 
