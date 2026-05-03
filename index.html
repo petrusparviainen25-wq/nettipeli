@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL MINI FIXED</title>
+<title>NHL STYLE HOCKEY ENGINE</title>
 <style>
 body { margin:0; overflow:hidden; background:#000; }
 canvas { display:block; }
@@ -24,16 +24,16 @@ canvas { display:block; }
 
 <script>
 
-// ================= SCENE =================
+// ================= WORLD =================
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xaadfff);
 
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 1000);
-camera.position.set(0,25,45);
+const camera = new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.1,1000);
+camera.position.set(0,28,48);
 camera.lookAt(0,0,0);
 
 const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(innerWidth,innerHeight);
 document.body.appendChild(renderer.domElement);
 
 scene.add(new THREE.DirectionalLight(0xffffff,1.2).position.set(10,30,10));
@@ -42,51 +42,34 @@ scene.add(new THREE.AmbientLight(0x777777));
 // ================= ICE =================
 const ice = new THREE.Mesh(
   new THREE.PlaneGeometry(120,80),
-  new THREE.MeshStandardMaterial({
-    color:0xe8f6ff,
-    roughness:0.08,
-    metalness:0.1
-  })
+  new THREE.MeshStandardMaterial({color:0xe8f6ff, roughness:0.08})
 );
 ice.rotation.x = -Math.PI/2;
 scene.add(ice);
 
-// center line
-scene.add(new THREE.Line(
-  new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(-60,0.1,0),
-    new THREE.Vector3(60,0.1,0)
-  ]),
-  new THREE.LineBasicMaterial({color:0xff0000})
-));
-
 // ================= PLAYER =================
-const player = new THREE.Group();
-const pBody = new THREE.Mesh(
+const player = new THREE.Mesh(
   new THREE.CapsuleGeometry(1.2,2,4,8),
-  new THREE.MeshStandardMaterial({color:0x0055ff})
+  new THREE.MeshStandardMaterial({color:0x0066ff})
 );
-player.add(pBody);
 player.position.set(0,2,30);
 scene.add(player);
 
 // ================= AI =================
-const ai = new THREE.Group();
-const aBody = new THREE.Mesh(
+const ai = new THREE.Mesh(
   new THREE.CapsuleGeometry(1.2,2,4,8),
   new THREE.MeshStandardMaterial({color:0xff3333})
 );
-ai.add(aBody);
 ai.position.set(0,2,-30);
 scene.add(ai);
 
-// ================= GOAL =================
-const goal = new THREE.Mesh(
-  new THREE.BoxGeometry(12,6,1),
-  new THREE.MeshStandardMaterial({color:0xff0000, wireframe:true})
+// ================= GOALIE =================
+const goalie = new THREE.Mesh(
+  new THREE.CapsuleGeometry(1.5,2.5,4,8),
+  new THREE.MeshStandardMaterial({color:0xffffff})
 );
-goal.position.set(0,3,-35);
-scene.add(goal);
+goalie.position.set(0,2,-33);
+scene.add(goalie);
 
 // ================= PUCK =================
 const puck = new THREE.Mesh(
@@ -98,60 +81,72 @@ puck.position.set(0,1,0);
 scene.add(puck);
 
 // ================= INPUT =================
-let keys = {};
-document.addEventListener("keydown",e=>keys[e.code]=true);
-document.addEventListener("keyup",e=>keys[e.code]=false);
+let keys={};
+addEventListener("keydown",e=>keys[e.code]=true);
+addEventListener("keyup",e=>keys[e.code]=false);
 
-let mouse = {x:0,y:0};
-let aim = new THREE.Vector3();
-
-window.addEventListener("mousemove",(e)=>{
-  mouse.x = (e.clientX/window.innerWidth - 0.5)*2;
-  mouse.y = (e.clientY/window.innerHeight - 0.5)*2;
+let mouse={x:0,y:0};
+addEventListener("mousemove",e=>{
+  mouse.x=(e.clientX/innerWidth-0.5)*2;
+  mouse.y=(e.clientY/innerHeight-0.5)*2;
 });
 
 // ================= GAME STATE =================
-let vx=0, vz=0;
+let vx=0,vz=0;
 let hasPuck=false;
 
 let playerScore=0;
 let aiScore=0;
 
-// ================= SHOOT (FIXED RELIABLE) =================
-window.addEventListener("mousedown",()=>{
+// ================= AIM =================
+function aimPoint(){
+  return {
+    x: player.position.x + mouse.x*20,
+    z: player.position.z + mouse.y*20 - 15
+  };
+}
+
+// ================= SHOOT =================
+addEventListener("mousedown",()=>{
 
   if(!hasPuck) return;
 
-  vx = (aim.x - player.position.x) * 0.35;
-  vz = (aim.z - player.position.z) * 0.35;
+  const aim = aimPoint();
+
+  vx = (aim.x - player.position.x) * 0.32;
+  vz = (aim.z - player.position.z) * 0.32;
 
   hasPuck = false;
 });
 
-// ================= AI =================
+// ================= AI ENGINE (REAL PLAY STYLE) =================
 function aiLogic(){
 
-  // AI seuraa kiekkoa
-  let targetX = puck.position.x;
+  // AI follows puck but also tries to defend center
+  let targetX = puck.position.x * 0.7;
 
-  // pysyy maalissa (RAJOITUS)
-  targetX = Math.max(-5, Math.min(5, targetX));
+  ai.position.x += (targetX - ai.position.x) * 0.06;
 
-  ai.position.x += (targetX - ai.position.x) * 0.08;
+  // AI pressure zone
+  if(puck.position.z < -5){
+    ai.position.z += 0.05;
+  } else {
+    ai.position.z -= 0.03;
+  }
 
-  // ei karkaa maalista
-  ai.position.z = -30;
+  ai.position.z = Math.max(-35,Math.min(-5,ai.position.z));
 }
 
 // ================= RESET =================
 function reset(){
 
   puck.position.set(0,1,0);
-  vx=0; vz=0;
+  vx=0;vz=0;
   hasPuck=false;
 
   player.position.set(0,2,30);
   ai.position.set(0,2,-30);
+  goalie.position.set(0,2,-33);
 }
 
 // ================= LOOP =================
@@ -159,33 +154,22 @@ function animate(){
 
   requestAnimationFrame(animate);
 
-  // ================= PLAYER MOVE =================
+  // ================= PLAYER =================
   if(keys["KeyA"]) player.position.x -= 0.7;
   if(keys["KeyD"]) player.position.x += 0.7;
   if(keys["KeyW"]) player.position.z -= 0.7;
   if(keys["KeyS"]) player.position.z += 0.7;
 
-  player.position.x = Math.max(-55,Math.min(55,player.position.x));
-  player.position.z = Math.max(-10,Math.min(55,player.position.z));
-
-  // ================= AIM =================
-  aim.x = player.position.x + mouse.x * 18;
-  aim.z = player.position.z + mouse.y * 18 - 15;
+  player.position.x=Math.max(-55,Math.min(55,player.position.x));
+  player.position.z=Math.max(-10,Math.min(55,player.position.z));
 
   // ================= PUCK PICKUP =================
   let dx = puck.position.x - player.position.x;
   let dz = puck.position.z - player.position.z;
   let dist = Math.sqrt(dx*dx + dz*dz);
 
-  if(dist < 3.5){
-    hasPuck = true;
-  }
+  if(dist < 3.5) hasPuck = true;
 
-  if(hasPuck && dist > 6){
-    hasPuck = false;
-  }
-
-  // ================= PUCK CONTROL =================
   if(hasPuck){
     puck.position.x = player.position.x;
     puck.position.z = player.position.z - 2;
@@ -211,6 +195,17 @@ function animate(){
     vz = (player.position.z - ai.position.z) * 0.3;
   }
 
+  // ================= GOALIE =================
+  goalie.position.x += (puck.position.x - goalie.position.x) * 0.08;
+  goalie.position.x = Math.max(-5,Math.min(5,goalie.position.x));
+  goalie.position.z = -33;
+
+  // save
+  if(puck.position.z < -30 &&
+     Math.abs(puck.position.x - goalie.position.x) < 3){
+    vx *= -0.5;
+  }
+
   // ================= GOALS =================
   if(puck.position.z < -35){
     playerScore++;
@@ -231,11 +226,10 @@ function animate(){
 
 animate();
 
-// ================= RESIZE =================
-window.addEventListener("resize",()=>{
-  camera.aspect = window.innerWidth/window.innerHeight;
+addEventListener("resize",()=>{
+  camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth,window.innerHeight);
+  renderer.setSize(innerWidth,innerHeight);
 });
 
 </script>
