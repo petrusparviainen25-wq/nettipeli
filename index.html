@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL V20 STABLE</title>
+<title>NHL V22 STABLE</title>
 <style>
 body { margin:0; overflow:hidden; background:#87cfff; }
 canvas { display:block; }
@@ -25,7 +25,7 @@ canvas { display:block; }
 <script>
 
 /////////////////////////////////////////////////////
-// 🌍 SAFE STATE
+// 🌍 STATE SAFE
 /////////////////////////////////////////////////////
 
 let scene, camera, renderer;
@@ -47,7 +47,7 @@ let goalieDelay=0;
 let score=0;
 
 /////////////////////////////////////////////////////
-// INIT SAFE
+// INIT
 /////////////////////////////////////////////////////
 
 function init(){
@@ -111,7 +111,7 @@ function boards(){
 }
 
 /////////////////////////////////////////////////////
-// 🥅 GOAL (VISIBLE FIX)
+// 🥅 GOAL
 /////////////////////////////////////////////////////
 
 function goalNet(){
@@ -123,8 +123,8 @@ function goalNet(){
  const net = new THREE.MeshStandardMaterial({
   color:0xffffff,
   wireframe:true,
-  opacity:0.7,
-  transparent:true
+  transparent:true,
+  opacity:0.7
  });
 
  const z = -25;
@@ -182,7 +182,7 @@ function player(color,x,z){
 }
 
 /////////////////////////////////////////////////////
-// 🥅 GOALIE (SIMPLE BUT FUNCTIONAL)
+// 🥅 GOALIE
 /////////////////////////////////////////////////////
 
 function goaliePlayer(x,z){
@@ -253,7 +253,7 @@ addEventListener("mousemove",e=>{
 });
 
 /////////////////////////////////////////////////////
-// ACTIVE PLAYER
+// ACTIVE
 /////////////////////////////////////////////////////
 
 function active(){
@@ -261,7 +261,7 @@ function active(){
 }
 
 /////////////////////////////////////////////////////
-// MOVE
+// MOVE (FASTER FIX)
 /////////////////////////////////////////////////////
 
 function move(){
@@ -269,24 +269,22 @@ function move(){
  let p=active();
  if(!p) return;
 
- let a=0.12;
+ const speed=0.18;
 
- if(keys["KeyA"]) p.position.x-=a;
- if(keys["KeyD"]) p.position.x+=a;
- if(keys["KeyW"]) p.position.z-=a;
- if(keys["KeyS"]) p.position.z+=a;
+ if(keys["KeyA"]) p.position.x-=speed;
+ if(keys["KeyD"]) p.position.x+=speed;
+ if(keys["KeyW"]) p.position.z-=speed;
+ if(keys["KeyS"]) p.position.z+=speed;
 }
 
 /////////////////////////////////////////////////////
-// PICKUP (SAFE)
+// PICKUP SAFE
 /////////////////////////////////////////////////////
 
 function pickup(){
 
  let p=active();
- if(!p||!puck) return;
-
- if(shotLock) return;
+ if(!p||shotLock) return;
 
  let d=Math.hypot(
   puck.position.x-p.position.x,
@@ -313,13 +311,12 @@ function stick(){
 }
 
 /////////////////////////////////////////////////////
-// SHOOT (FIXED 100%)
+// SHOOT FIXED (REALISTIC)
 /////////////////////////////////////////////////////
 
 function shoot(){
 
- let p=active();
- if(!p||puckOwner!==controlled) return;
+ if(puckOwner!==controlled) return;
 
  puckOwner=null;
  shotLock=true;
@@ -344,7 +341,7 @@ function shoot(){
  vz=dz*5.5;
  vy=(-mouse.y*2.2)+Math.random()*0.3;
 
- setTimeout(()=>shotLock=false,150);
+ setTimeout(()=>shotLock=false,120);
 }
 
 addEventListener("mousedown",shoot);
@@ -355,10 +352,10 @@ addEventListener("mousedown",shoot);
 
 function pass(){
 
+ if(puckOwner!==controlled) return;
+
  let p=active();
  let t=controlled==="user"?team:user;
-
- if(puckOwner!==controlled) return;
 
  let dx=t.position.x-p.position.x;
  let dz=t.position.z-p.position.z;
@@ -380,7 +377,7 @@ addEventListener("keydown",e=>{
 });
 
 /////////////////////////////////////////////////////
-// PHYSICS
+// PHYSICS (FIXED ICE FRICTION)
 /////////////////////////////////////////////////////
 
 function physics(){
@@ -396,17 +393,20 @@ function physics(){
 
  vy-=0.08;
 
- if(puck.position.y<1){
+ if(puck.position.y<=1){
   puck.position.y=1;
   vy=0;
- }
 
- vx*=0.96;
- vz*=0.96;
+  vx*=0.9;
+  vz*=0.9;
+ } else {
+  vx*=0.98;
+  vz*=0.98;
+ }
 }
 
 /////////////////////////////////////////////////////
-// GOALIE SIMPLE SAVE (ANGLE + HEIGHT + DELAY)
+// GOALIE AI (BASIC SAVE)
 /////////////////////////////////////////////////////
 
 function goalieAI(){
@@ -425,13 +425,13 @@ function goalieAI(){
 
  if(dist<10){
 
-  goalieDelay=18;
+  goalieDelay=16;
 
-  if(puck.position.y>2){
+  if(puck.position.y>2.3){
    vx*=0.3;
    vz+=0.4;
    vy=Math.abs(vy);
-  }else{
+  } else {
    vx*=0.5;
    vz+=0.6;
    vy=0;
