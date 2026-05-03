@@ -2,19 +2,15 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL WORKING</title>
+<title>NHL AUTO START FIX</title>
 <style>
 body { margin:0; background:#0b1d2a; color:white; text-align:center; }
 canvas { display:block; margin:auto; background:#e6f7ff; border:3px solid white; }
-button { padding:10px; margin:10px; }
 </style>
 </head>
 <body>
 
-<h2>🏒 NHL WORKING TEST</h2>
-
-<button onclick="start()">START</button>
-
+<h2>🏒 NHL AUTO START</h2>
 <p>Pisteet: <span id="score">0</span></p>
 
 <canvas id="c" width="600" height="400"></canvas>
@@ -23,34 +19,37 @@ button { padding:10px; margin:10px; }
 const c = document.getElementById("c");
 const ctx = c.getContext("2d");
 
-let player, puck, score = 0, running = false;
+let player = {x:300,y:350};
+let puck = {x:300,y:200,vx:0,vy:0};
+let score = 0;
 let keys = {};
 
 document.addEventListener("keydown", e => keys[e.code] = true);
 document.addEventListener("keyup", e => keys[e.code] = false);
 
-function start(){
+// 🔥 AUTO START — EI NAPPIA
+function init(){
   player = {x:300,y:350};
   puck = {x:300,y:200,vx:0,vy:0};
   score = 0;
-  running = true;
 }
 
-function update(){
-  if(!running) return;
+init();
 
-  // player move
+function update(){
+
+  // liike
   if(keys["ArrowLeft"]) player.x -= 4;
   if(keys["ArrowRight"]) player.x += 4;
 
-  // puck follow physics
+  // kiekko
   puck.x += puck.vx;
   puck.y += puck.vy;
 
   puck.vx *= 0.98;
   puck.vy *= 0.98;
 
-  // hit puck
+  // osuma
   let dx = puck.x - player.x;
   let dy = puck.y - player.y;
   let dist = Math.sqrt(dx*dx + dy*dy);
@@ -60,24 +59,23 @@ function update(){
     puck.vy += dy * 0.05;
   }
 
-  // shoot (SPACE)
+  // laukaus
   if(keys["Space"]){
     puck.vx = (puck.x - player.x) * 0.2;
     puck.vy = -5;
   }
 
-  // goal
+  // maali
   if(puck.y < 10 && puck.x > 250 && puck.x < 350){
     score++;
     document.getElementById("score").innerText = score;
-
     puck.x = 300;
     puck.y = 200;
     puck.vx = 0;
     puck.vy = 0;
   }
 
-  // walls
+  // seinät
   if(puck.x < 0 || puck.x > 600) puck.vx *= -1;
   if(puck.y < 0 || puck.y > 400) puck.vy *= -1;
 }
@@ -85,19 +83,18 @@ function update(){
 function draw(){
   ctx.clearRect(0,0,600,400);
 
-  // ice
   ctx.fillStyle="#e6f7ff";
   ctx.fillRect(0,0,600,400);
 
-  // goal line
+  // maali
   ctx.fillStyle="red";
   ctx.fillRect(250,0,100,10);
 
-  // player
+  // pelaaja
   ctx.fillStyle="blue";
   ctx.fillRect(player.x-15,player.y-15,30,30);
 
-  // puck
+  // kiekko
   ctx.fillStyle="black";
   ctx.beginPath();
   ctx.arc(puck.x,puck.y,8,0,Math.PI*2);
