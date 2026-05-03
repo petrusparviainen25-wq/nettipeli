@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL FIXED GAME</title>
+<title>NHL MINI FIXED</title>
 <style>
 body { margin:0; overflow:hidden; background:#000; }
 canvas { display:block; }
@@ -24,7 +24,7 @@ canvas { display:block; }
 
 <script>
 
-// ================= BASIC SETUP =================
+// ================= SCENE =================
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xaadfff);
 
@@ -42,10 +42,23 @@ scene.add(new THREE.AmbientLight(0x777777));
 // ================= ICE =================
 const ice = new THREE.Mesh(
   new THREE.PlaneGeometry(120,80),
-  new THREE.MeshStandardMaterial({color:0xe8f6ff, roughness:0.1})
+  new THREE.MeshStandardMaterial({
+    color:0xe8f6ff,
+    roughness:0.08,
+    metalness:0.1
+  })
 );
 ice.rotation.x = -Math.PI/2;
 scene.add(ice);
+
+// center line
+scene.add(new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-60,0.1,0),
+    new THREE.Vector3(60,0.1,0)
+  ]),
+  new THREE.LineBasicMaterial({color:0xff0000})
+));
 
 // ================= PLAYER =================
 const player = new THREE.Group();
@@ -67,6 +80,14 @@ ai.add(aBody);
 ai.position.set(0,2,-30);
 scene.add(ai);
 
+// ================= GOAL =================
+const goal = new THREE.Mesh(
+  new THREE.BoxGeometry(12,6,1),
+  new THREE.MeshStandardMaterial({color:0xff0000, wireframe:true})
+);
+goal.position.set(0,3,-35);
+scene.add(goal);
+
 // ================= PUCK =================
 const puck = new THREE.Mesh(
   new THREE.CylinderGeometry(1,1,0.5,16),
@@ -76,14 +97,6 @@ puck.rotation.x = Math.PI/2;
 puck.position.set(0,1,0);
 scene.add(puck);
 
-// ================= GOAL =================
-const goal = new THREE.Mesh(
-  new THREE.BoxGeometry(12,6,1),
-  new THREE.MeshStandardMaterial({color:0xff0000, wireframe:true})
-);
-goal.position.set(0,3,-35);
-scene.add(goal);
-
 // ================= INPUT =================
 let keys = {};
 document.addEventListener("keydown",e=>keys[e.code]=true);
@@ -91,7 +104,6 @@ document.addEventListener("keyup",e=>keys[e.code]=false);
 
 let mouse = {x:0,y:0};
 let aim = new THREE.Vector3();
-let aimSmooth = new THREE.Vector3();
 
 window.addEventListener("mousemove",(e)=>{
   mouse.x = (e.clientX/window.innerWidth - 0.5)*2;
@@ -101,43 +113,45 @@ window.addEventListener("mousemove",(e)=>{
 // ================= GAME STATE =================
 let vx=0, vz=0;
 let hasPuck=false;
+
 let playerScore=0;
 let aiScore=0;
 
-// ================= SHOOT (FIXED) =================
+// ================= SHOOT (FIXED RELIABLE) =================
 window.addEventListener("mousedown",()=>{
 
   if(!hasPuck) return;
 
-  vx = (aimSmooth.x - player.position.x) * 0.32;
-  vz = (aimSmooth.z - player.position.z) * 0.32;
+  vx = (aim.x - player.position.x) * 0.35;
+  vz = (aim.z - player.position.z) * 0.35;
 
   hasPuck = false;
 });
 
+// ================= AI =================
+function aiLogic(){
+
+  // AI seuraa kiekkoa
+  let targetX = puck.position.x;
+
+  // pysyy maalissa (RAJOITUS)
+  targetX = Math.max(-5, Math.min(5, targetX));
+
+  ai.position.x += (targetX - ai.position.x) * 0.08;
+
+  // ei karkaa maalista
+  ai.position.z = -30;
+}
+
 // ================= RESET =================
 function reset(){
+
   puck.position.set(0,1,0);
   vx=0; vz=0;
   hasPuck=false;
 
   player.position.set(0,2,30);
   ai.position.set(0,2,-30);
-}
-
-// ================= AI =================
-function aiLogic(){
-
-  ai.position.x += (puck.position.x - ai.position.x) * 0.06;
-
-  // AI attack/defense logic
-  if(puck.position.z < -10){
-    ai.position.z += 0.04;
-  } else {
-    ai.position.z -= 0.02;
-  }
-
-  ai.position.z = Math.max(-35,Math.min(-5,ai.position.z));
 }
 
 // ================= LOOP =================
@@ -157,18 +171,16 @@ function animate(){
   // ================= AIM =================
   aim.x = player.position.x + mouse.x * 18;
   aim.z = player.position.z + mouse.y * 18 - 15;
-  aimSmooth.lerp(aim,0.2);
 
-  // ================= PUCK PICKUP (FIXED) =================
+  // ================= PUCK PICKUP =================
   let dx = puck.position.x - player.position.x;
   let dz = puck.position.z - player.position.z;
   let dist = Math.sqrt(dx*dx + dz*dz);
 
-  if(dist < 3.8){
+  if(dist < 3.5){
     hasPuck = true;
   }
 
-  // release safety
   if(hasPuck && dist > 6){
     hasPuck = false;
   }
@@ -195,8 +207,8 @@ function animate(){
   let dist2 = Math.sqrt(dx2*dx2 + dz2*dz2);
 
   if(dist2 < 3.5 && !hasPuck){
-    vx = (player.position.x - ai.position.x) * 0.25;
-    vz = (player.position.z - ai.position.z) * 0.25;
+    vx = (player.position.x - ai.position.x) * 0.3;
+    vz = (player.position.z - ai.position.z) * 0.3;
   }
 
   // ================= GOALS =================
