@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL SHOT POWER FULL</title>
+<title>NHL SHOT V2 FULL</title>
 <style>
 body { margin:0; overflow:hidden; }
 canvas { display:block; }
@@ -50,26 +50,29 @@ scene.add(ice);
 // 🥅 GOAL
 /////////////////////////////////////////////////////
 
-const goal = new THREE.Group();
-const mat = new THREE.MeshStandardMaterial({color:0xff0000});
+function goal(){
+  const g=new THREE.Group();
+  const m=new THREE.MeshStandardMaterial({color:0xff0000});
 
-const l = new THREE.Mesh(new THREE.BoxGeometry(0.5,8,0.5),mat);
-const r = new THREE.Mesh(new THREE.BoxGeometry(0.5,8,0.5),mat);
-const t = new THREE.Mesh(new THREE.BoxGeometry(12,0.5,0.5),mat);
+  const l=new THREE.Mesh(new THREE.BoxGeometry(0.5,8,0.5),m);
+  const r=new THREE.Mesh(new THREE.BoxGeometry(0.5,8,0.5),m);
+  const t=new THREE.Mesh(new THREE.BoxGeometry(12,0.5,0.5),m);
 
-l.position.set(-6,4,-40);
-r.position.set(6,4,-40);
-t.position.set(0,8,-40);
+  l.position.set(-6,4,-40);
+  r.position.set(6,4,-40);
+  t.position.set(0,8,-40);
 
-goal.add(l,r,t);
-scene.add(goal);
+  g.add(l,r,t);
+  scene.add(g);
+}
+goal();
 
 /////////////////////////////////////////////////////
 // 🧍 PLAYERS
 /////////////////////////////////////////////////////
 
 function player(c,x,z){
-  const p = new THREE.Mesh(
+  const p=new THREE.Mesh(
     new THREE.CapsuleGeometry(1.2,2,6,10),
     new THREE.MeshStandardMaterial({color:c})
   );
@@ -78,17 +81,16 @@ function player(c,x,z){
   return p;
 }
 
-const user = player(0x0066ff,0,30);
-const team = player(0x3399ff,6,30);
-
-const ai1 = player(0xff3333,-5,-20);
-const ai2 = player(0xff7777,5,-15);
+const user=player(0x0066ff,0,30);
+const team=player(0x3399ff,6,30);
+const ai1=player(0xff3333,-5,-20);
+const ai2=player(0xff7777,5,-15);
 
 /////////////////////////////////////////////////////
 // 🥅 GOALIE
 /////////////////////////////////////////////////////
 
-const goalie = new THREE.Mesh(
+const goalie=new THREE.Mesh(
   new THREE.CapsuleGeometry(1.6,2.5,6,10),
   new THREE.MeshStandardMaterial({color:0xffffff})
 );
@@ -99,11 +101,11 @@ scene.add(goalie);
 // 🏒 PUCK
 /////////////////////////////////////////////////////
 
-const puck = new THREE.Mesh(
+const puck=new THREE.Mesh(
   new THREE.CylinderGeometry(1,1,0.5,16),
   new THREE.MeshStandardMaterial({color:0x000000})
 );
-puck.rotation.x = Math.PI/2;
+puck.rotation.x=Math.PI/2;
 puck.position.set(0,1,0);
 scene.add(puck);
 
@@ -118,6 +120,7 @@ let keys={};
 
 let controlled="user";
 
+let stamina=100;
 let pressTime=0;
 
 /////////////////////////////////////////////////////
@@ -131,6 +134,8 @@ addEventListener("mousemove",e=>{
   mouse.x=(e.clientX/innerWidth-0.5)*2;
   mouse.y=(e.clientY/innerHeight-0.5)*2;
 });
+
+addEventListener("mousedown",()=>pressTime=Date.now());
 
 /////////////////////////////////////////////////////
 // ACTIVE PLAYER
@@ -146,7 +151,6 @@ function active(){
 
 function move(){
   const p=active();
-
   if(keys["KeyA"])p.position.x-=0.8;
   if(keys["KeyD"])p.position.x+=0.8;
   if(keys["KeyW"])p.position.z-=0.8;
@@ -174,52 +178,56 @@ function pickup(){
 }
 
 /////////////////////////////////////////////////////
-// 🏒 SHOOT (POWER SYSTEM)
+// 🏒 SHOOT V2
 /////////////////////////////////////////////////////
 
-function shoot(){
+addEventListener("mouseup",()=>{
 
   if(!hasPuck()) return;
 
-  const p = active();
+  const p=active();
 
-  let dx = mouse.x;
-  let dz = mouse.y;
+  let dx=mouse.x;
+  let dz=mouse.y;
 
-  let len = Math.sqrt(dx*dx + dz*dz);
-  if(len === 0){
-    dx = 0;
-    dz = -1;
-    len = 1;
-  }
+  let len=Math.sqrt(dx*dx+dz*dz);
+  if(len===0){dx=0;dz=-1;len=1;}
 
-  // 🎯 pieni NHL-tason hajonta (ei arcade spread)
-  const accuracy = 0.02;
+  // 🧠 shot type
+  const hold=Math.min(1,(Date.now()-pressTime)/900);
 
-  dx += (Math.random()-0.5) * accuracy;
-  dz += (Math.random()-0.5) * accuracy;
+  let type="wrist";
+  if(hold>0.7) type="slap";
+  else if(hold>0.3) type="snap";
 
-  // 🏒 SUORA VELOCITY (EI pomppua)
-  const basePower = 4.2;
+  // 🫁 stamina factor
+  const staminaFactor=0.6+(stamina/100)*0.8;
 
-  vx = (dx / len) * basePower;
-  vz = (dz / len) * basePower;
+  let power=0;
 
-  // 🧊 TÄRKEÄ FIX: poistetaan “hyppy”
-  vy = 0;
+  if(type==="wrist") power=3.2*staminaFactor;
+  if(type==="snap") power=4.5*staminaFactor;
+  if(type==="slap") power=6.5*staminaFactor;
 
-  // puck pysyy jäässä laukauksen alussa
-  puck.position.y = 1;
-}
+  vx=(dx/len)*power;
+  vz=(dz/len)*power;
+
+  vy=0;
+
+  stamina-=type==="slap"?18:type==="snap"?10:6;
+  stamina=Math.max(0,stamina);
+
+  puck.position.y=1;
+});
+
 /////////////////////////////////////////////////////
 // PASS
 /////////////////////////////////////////////////////
 
 function pass(){
-
   if(!hasPuck()) return;
 
-  const t = controlled==="user"?team:user;
+  const t=controlled==="user"?team:user;
 
   let dx=t.position.x-active().position.x;
   let dz=t.position.z-active().position.z;
@@ -230,12 +238,32 @@ function pass(){
   vz=(dz/len)*2.5;
   vy=0;
 
-  controlled = controlled==="user"?"team":"user";
+  controlled=controlled==="user"?"team":"user";
 }
 
 addEventListener("keydown",e=>{
   if(e.code==="Space") pass();
 });
+
+/////////////////////////////////////////////////////
+// BLOCK SYSTEM
+/////////////////////////////////////////////////////
+
+function block(p){
+
+  let dx=puck.position.x-p.position.x;
+  let dz=puck.position.z-p.position.z;
+
+  let dist=Math.sqrt(dx*dx+dz*dz);
+
+  if(dist<2.2){
+    vx*=0.4;
+    vz*=0.4;
+
+    vx+=(Math.random()-0.5)*0.6;
+    vz+=(Math.random()-0.5)*0.6;
+  }
+}
 
 /////////////////////////////////////////////////////
 // PHYSICS
@@ -257,18 +285,17 @@ function physics(){
   vx*=0.96;
   vz*=0.96;
 
-  // 🥅 goalie movement + block
-  goalie.position.x += (puck.position.x - goalie.position.x)*0.06;
-  goalie.position.x = Math.max(-6,Math.min(6,goalie.position.x));
+  // goalie move
+  goalie.position.x+=(puck.position.x-goalie.position.x)*0.06;
+  goalie.position.x=Math.max(-6,Math.min(6,goalie.position.x));
 
-  if(
-    puck.position.z<-37 &&
-    Math.abs(puck.position.x-goalie.position.x)<2.3
-  ){
-    vx*=-0.3;
-    vz*=0.3;
-    vy=2;
-  }
+  // goalie block
+  block(goalie);
+  block(ai1);
+  block(ai2);
+
+  stamina+=0.12;
+  stamina=Math.min(100,stamina);
 }
 
 /////////////////////////////////////////////////////
