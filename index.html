@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL V2 GOALIE</title>
+<title>NHL SAFE FULL (NO WHITE SCREEN)</title>
 <style>
 body { margin:0; overflow:hidden; }
 canvas { display:block; }
@@ -14,31 +14,24 @@ canvas { display:block; }
 
 <script>
 
-/////////////////////////////////////////////////////
-// 🌍 WORLD
-/////////////////////////////////////////////////////
-
+// ===== SCENE =====
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87cfff);
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 1000);
 camera.position.set(0,25,60);
-camera.lookAt(0,0,0);
 
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
+// ===== LIGHT =====
 scene.add(new THREE.AmbientLight(0xffffff,1.2));
-
 const light = new THREE.DirectionalLight(0xffffff,1.5);
 light.position.set(10,30,10);
 scene.add(light);
 
-/////////////////////////////////////////////////////
-// 🧊 ICE
-/////////////////////////////////////////////////////
-
+// ===== ICE =====
 const ice = new THREE.Mesh(
   new THREE.PlaneGeometry(200,120),
   new THREE.MeshStandardMaterial({color:0xdff6ff})
@@ -46,30 +39,25 @@ const ice = new THREE.Mesh(
 ice.rotation.x = -Math.PI/2;
 scene.add(ice);
 
-  function makeBoards(){
-
+// ===== BOARDS =====
+function makeBoards(){
   const mat = new THREE.MeshStandardMaterial({color:0xffffff});
 
   const left = new THREE.Mesh(new THREE.BoxGeometry(2,3,120),mat);
   const right = new THREE.Mesh(new THREE.BoxGeometry(2,3,120),mat);
-
   const top = new THREE.Mesh(new THREE.BoxGeometry(200,3,2),mat);
   const bottom = new THREE.Mesh(new THREE.BoxGeometry(200,3,2),mat);
 
   left.position.set(-100,1.5,0);
   right.position.set(100,1.5,0);
-
   top.position.set(0,1.5,-60);
   bottom.position.set(0,1.5,60);
 
   scene.add(left,right,top,bottom);
 }
-
 makeBoards();
-/////////////////////////////////////////////////////
-// 🥅 GOAL
-/////////////////////////////////////////////////////
 
+// ===== GOAL =====
 function makeGoal(){
   const g=new THREE.Group();
   const m=new THREE.MeshStandardMaterial({color:0xff0000});
@@ -87,10 +75,7 @@ function makeGoal(){
 }
 makeGoal();
 
-/////////////////////////////////////////////////////
-// 🧍 PLAYERS
-/////////////////////////////////////////////////////
-
+// ===== PLAYERS =====
 function player(c,x,z){
   const p=new THREE.Mesh(
     new THREE.CapsuleGeometry(1.2,2,6,10),
@@ -106,10 +91,7 @@ const team=player(0x3399ff,6,30);
 const ai1=player(0xff3333,-5,-20);
 const ai2=player(0xff7777,5,-15);
 
-/////////////////////////////////////////////////////
-// 🥅 GOALIE
-/////////////////////////////////////////////////////
-
+// ===== GOALIE =====
 const goalie=new THREE.Mesh(
   new THREE.CapsuleGeometry(1.6,2.5,6,10),
   new THREE.MeshStandardMaterial({color:0xffffff})
@@ -117,10 +99,7 @@ const goalie=new THREE.Mesh(
 goalie.position.set(0,2,-38);
 scene.add(goalie);
 
-/////////////////////////////////////////////////////
-// 🏒 PUCK
-/////////////////////////////////////////////////////
-
+// ===== PUCK =====
 const puck=new THREE.Mesh(
   new THREE.CylinderGeometry(1,1,0.5,16),
   new THREE.MeshStandardMaterial({color:0x000000})
@@ -129,27 +108,14 @@ puck.rotation.x=Math.PI/2;
 puck.position.set(0,1,0);
 scene.add(puck);
 
-/////////////////////////////////////////////////////
-// 🧠 STATE
-/////////////////////////////////////////////////////
-
+// ===== STATE =====
 let vx=0,vz=0,vy=0;
-
 let mouse={x:0,y:0};
 let keys={};
-
 let controlled="user";
-
-let stamina=100;
 let pressTime=0;
 
-let goalieTargetX=0;
-let goalieReaction=0.12;
-
-/////////////////////////////////////////////////////
-// INPUT
-/////////////////////////////////////////////////////
-
+// ===== INPUT =====
 addEventListener("keydown",e=>keys[e.code]=true);
 addEventListener("keyup",e=>keys[e.code]=false);
 
@@ -160,31 +126,21 @@ addEventListener("mousemove",e=>{
 
 addEventListener("mousedown",()=>pressTime=Date.now());
 
-/////////////////////////////////////////////////////
-// ACTIVE PLAYER
-/////////////////////////////////////////////////////
-
+// ===== ACTIVE =====
 function active(){
   return controlled==="user"?user:team;
 }
 
-/////////////////////////////////////////////////////
-// MOVE
-/////////////////////////////////////////////////////
-
+// ===== MOVE =====
 function move(){
   const p=active();
-
   if(keys["KeyA"])p.position.x-=0.8;
   if(keys["KeyD"])p.position.x+=0.8;
   if(keys["KeyW"])p.position.z-=0.8;
   if(keys["KeyS"])p.position.z+=0.8;
 }
 
-/////////////////////////////////////////////////////
-// PUCK PICKUP
-/////////////////////////////////////////////////////
-
+// ===== PUCK PICKUP =====
 function hasPuck(){
   const p=active();
   let dx=puck.position.x-p.position.x;
@@ -194,19 +150,14 @@ function hasPuck(){
 
 function pickup(){
   if(!hasPuck()) return;
-
   const p=active();
   puck.position.x=p.position.x;
   puck.position.z=p.position.z-2;
   puck.position.y=1;
 }
 
-/////////////////////////////////////////////////////
-// 🏒 SHOOT SYSTEM V2
-/////////////////////////////////////////////////////
-
+// ===== SHOOT =====
 addEventListener("mouseup",()=>{
-
   if(!hasPuck()) return;
 
   let dx=mouse.x;
@@ -215,215 +166,74 @@ addEventListener("mouseup",()=>{
   let len=Math.sqrt(dx*dx+dz*dz);
   if(len===0){dx=0;dz=-1;len=1;}
 
-  const hold=Math.min(1,(Date.now()-pressTime)/900);
-
-  let type="wrist";
-  if(hold>0.7) type="slap";
-  else if(hold>0.3) type="snap";
-
-  const staminaFactor=0.6+(stamina/100)*0.8;
-
-  let power=0;
-
-  if(type==="wrist") power=3.2*staminaFactor;
-  if(type==="snap") power=4.5*staminaFactor;
-  if(type==="slap") power=6.5*staminaFactor;
-
-  vx=(dx/len)*power;
-  vz=(dz/len)*power;
-
+  vx=(dx/len)*4.5;
+  vz=(dz/len)*4.5;
   vy=0;
-
-  stamina-=type==="slap"?18:type==="snap"?10:6;
-  stamina=Math.max(0,stamina);
 
   puck.position.y=1;
 });
 
-/////////////////////////////////////////////////////
-// PASS
-/////////////////////////////////////////////////////
-
-function pass(){
-  if(!hasPuck()) return;
-
-  const t=controlled==="user"?team:user;
-
-  let dx=t.position.x-active().position.x;
-  let dz=t.position.z-active().position.z;
-
-  let len=Math.sqrt(dx*dx+dz*dz);
-
-  vx=(dx/len)*2.5;
-  vz=(dz/len)*2.5;
-  vy=0;
-
-  controlled=controlled==="user"?"team":"user";
-}
-
+// ===== PASS =====
 addEventListener("keydown",e=>{
-  if(e.code==="Space") pass();
+  if(e.code==="Space"){
+    const t=controlled==="user"?team:user;
+
+    let dx=t.position.x-active().position.x;
+    let dz=t.position.z-active().position.z;
+
+    let len=Math.sqrt(dx*dx+dz*dz);
+
+    vx=(dx/len)*2.5;
+    vz=(dz/len)*2.5;
+
+    controlled=controlled==="user"?"team":"user";
+  }
 });
 
-/////////////////////////////////////////////////////
-// 🥅 GOALIE AI v2
-/////////////////////////////////////////////////////
+// ===== BOARDS COLLISION =====
+function boards(){
+  if(puck.position.x < -98){puck.position.x=-98;vx*=-0.6;}
+  if(puck.position.x > 98){puck.position.x=98;vx*=-0.6;}
+  if(puck.position.z < -58){puck.position.z=-58;vz*=-0.6;}
+  if(puck.position.z > 58){puck.position.z=58;vz*=-0.6;}
+}
 
+// ===== GOALIE =====
 function goalieAI(){
-
-  const predictX = puck.position.x + vx * 10;
-
-  goalieTargetX = Math.max(-6, Math.min(6, predictX));
-
-  goalie.position.x += (goalieTargetX - goalie.position.x) * goalieReaction;
+  const target = puck.position.x + vx*10;
+  goalie.position.x += (target - goalie.position.x)*0.08;
 }
 
-/////////////////////////////////////////////////////
-// 🧤 SAVE + DIVE
-/////////////////////////////////////////////////////
-
-function goalieSave(){
-
-  const dx = puck.position.x - goalie.position.x;
-  const dz = puck.position.z - goalie.position.z;
-
-  const dist = Math.sqrt(dx*dx+dz*dz);
-
-  const inZone = puck.position.z < -34;
-
-  if(!inZone) return;
-
-  const angle = Math.abs(dx);
-  const chance = 1 - (angle / 6);
-
-  if(dist < 3.0 && Math.random() < chance){
-
-    vx *= -0.35;
-    vz *= 0.25;
-    vy = 1.8 + Math.random()*1.2;
-
-    return;
-  }
-
-  if(dist < 5.5 && Math.random() < 0.25){
-
-    goalie.position.x += (dx>0?1:-1)*1.8;
-
-    vx *= -0.2;
-    vz *= 0.2;
-
-    vy = 2.5;
-  }
-}
-
-/////////////////////////////////////////////////////
-// 🧱 BLOCK SYSTEM
-/////////////////////////////////////////////////////
-
-function block(p){
-
-  let dx=puck.position.x-p.position.x;
-  let dz=puck.position.z-p.position.z;
-
-  let d=Math.sqrt(dx*dx+dz*dz);
-
-  if(d<2.2){
-    vx*=0.4;
-    vz*=0.4;
-
-    vx+=(Math.random()-0.5)*0.6;
-    vz+=(Math.random()-0.5)*0.6;
-  }
-}
-
-/////////////////////////////////////////////////////
-// PHYSICS
-/////////////////////////////////////////////////////
-
+// ===== PHYSICS =====
 function physics(){
-function checkBoards(){
 
-  // vasen / oikea
-  if(puck.position.x < -98){
-    puck.position.x = -98;
-    vx *= -0.6;
-  }
-
-  if(puck.position.x > 98){
-    puck.position.x = 98;
-    vx *= -0.6;
-  }
-
-  // ylä / ala
-  if(puck.position.z < -58){
-    puck.position.z = -58;
-    vz *= -0.6;
-  }
-
-  if(puck.position.z > 58){
-    puck.position.z = 58;
-    vz *= -0.6;
-  }
-}  puck.position.x+=vx;
+  puck.position.x+=vx;
   puck.position.z+=vz;
-  puck.position.y+=vy;
-
-  vy-=0.1;
-
-  if(puck.position.y<1){
-    puck.position.y=1;
-    vy=0;
-  }
 
   vx*=0.96;
   vz*=0.96;
 
+  boards();
   goalieAI();
-  goalieSave();
-
-  block(ai1);
-  block(ai2);
-  block(goalie);
-
-  stamina+=0.12;
-  stamina=Math.min(100,stamina);
 }
 
-/////////////////////////////////////////////////////
-// AI
-/////////////////////////////////////////////////////
-
-function ai(){
-  ai1.position.x+=(puck.position.x-ai1.position.x)*0.03;
-  ai2.position.x+=(puck.position.x-ai2.position.x)*0.03;
-}
-
-/////////////////////////////////////////////////////
-// CAMERA
-/////////////////////////////////////////////////////
-
+// ===== CAMERA =====
 function cam(){
   const p=active();
-
   camera.position.x+=(p.position.x-camera.position.x)*0.08;
   camera.position.z+=(p.position.z+25-camera.position.z)*0.08;
-
   camera.lookAt(p.position.x,0,p.position.z-10);
 }
 
-/////////////////////////////////////////////////////
-// LOOP
-/////////////////////////////////////////////////////
-
+// ===== LOOP =====
 function loop(){
   requestAnimationFrame(loop);
 
   move();
   pickup();
   physics();
-  ai();
   cam();
-  checkBoards();  
+
   renderer.render(scene,camera);
 }
 
