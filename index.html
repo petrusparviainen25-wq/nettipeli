@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>Hockey Full Fix Final</title>
+<title>Hockey Full Accuracy Fix</title>
 <style>
 body { margin:0; overflow:hidden; background:#000; }
 canvas { display:block; }
@@ -65,28 +65,27 @@ ice.rotation.x = -Math.PI/2;
 scene.add(ice);
 
 /////////////////////////////////////////////////////
-// 🥅 GOAL (FIXED BIG VERSION)
+// 🥅 GOAL (HEIGHT FIX)
 /////////////////////////////////////////////////////
 
-function makeGoal(){
+function createGoal(){
 
   const g = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({color:0xff0000});
 
-  const left = new THREE.Mesh(new THREE.BoxGeometry(0.4,4,0.4),mat);
-  const right = new THREE.Mesh(new THREE.BoxGeometry(0.4,4,0.4),mat);
+  const left = new THREE.Mesh(new THREE.BoxGeometry(0.4,8,0.4),mat);
+  const right = new THREE.Mesh(new THREE.BoxGeometry(0.4,8,0.4),mat);
 
-  // 🥅 BIGGER WIDTH (FIX)
   const top = new THREE.Mesh(new THREE.BoxGeometry(12,0.4,0.4),mat);
 
-  left.position.set(-6,2,-40);
-  right.position.set(6,2,-40);
-  top.position.set(0,4,-40);
+  left.position.set(-6,4,-40);
+  right.position.set(6,4,-40);
+  top.position.set(0,8,-40);
 
   g.add(left,right,top);
   scene.add(g);
 }
-makeGoal();
+createGoal();
 
 /////////////////////////////////////////////////////
 // 🥅 GOALIE
@@ -103,7 +102,7 @@ scene.add(goalie);
 // 🏒 PLAYERS
 /////////////////////////////////////////////////////
 
-function player(color,z){
+function makePlayer(color,z){
   const p = new THREE.Mesh(
     new THREE.CapsuleGeometry(1.2,2,6,10),
     new THREE.MeshStandardMaterial({color})
@@ -113,10 +112,10 @@ function player(color,z){
   return p;
 }
 
-const user = player(0x0066ff,35);
-const teammate = player(0x3399ff,25);
-const ai = player(0xff3333,-35);
-const defender = player(0xff7777,-20);
+const user = makePlayer(0x0066ff,35);
+const teammate = makePlayer(0x3399ff,25);
+const ai = makePlayer(0xff3333,-35);
+const defender = makePlayer(0xff7777,-20);
 
 /////////////////////////////////////////////////////
 // 🧊 PUCK
@@ -142,7 +141,9 @@ let controlled = "user";
 let actionLock = false;
 
 let mouse = {x:0,y:0};
-let highShot = false;
+
+// 🎯 SHOOT ACCURACY (85%)
+let shotAccuracy = 0.85;
 
 /////////////////////////////////////////////////////
 // 🎮 INPUT
@@ -156,9 +157,6 @@ addEventListener("keyup",e=>keys[e.code]=false);
 addEventListener("mousemove",e=>{
   mouse.x = (e.clientX/innerWidth - 0.5)*2;
   mouse.y = (e.clientY/innerHeight - 0.5)*2;
-
-  // ✔ HIGH SHOT LOGIC (REAL FIX)
-  highShot = mouse.y < -0.25;
 });
 
 /////////////////////////////////////////////////////
@@ -193,7 +191,7 @@ function pickup(){
 }
 
 /////////////////////////////////////////////////////
-// 🏒 SHOOT (FIXED HIGH + LOW)
+// 🏒 SHOOT (85% ACCURACY FIXED)
 /////////////////////////////////////////////////////
 
 function shoot(){
@@ -206,18 +204,16 @@ function shoot(){
   let dx = mouse.x;
   let dz = mouse.y;
 
+  // 🎯 85% accuracy system
+  let noise = (1 - shotAccuracy);
+
+  dx += (Math.random() - 0.5) * noise * 0.6;
+  dz += (Math.random() - 0.5) * noise * 0.6;
+
   let len = Math.sqrt(dx*dx + dz*dz);
   if(len === 0){ actionLock=false; return; }
 
   let power = 3.2;
-
-  // ✔ HIGH SHOT FIX
-  if(highShot){
-    power = 2.6;
-    puck.position.y = 3.2;
-  } else {
-    puck.position.y = 1;
-  }
 
   vx = (dx/len)*power;
   vz = (dz/len)*power;
@@ -272,6 +268,7 @@ function physics(){
     const p = active();
     puck.position.x = p.position.x;
     puck.position.z = p.position.z - 2;
+    puck.position.y = 1;
     return;
   }
 
