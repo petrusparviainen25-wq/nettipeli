@@ -55,6 +55,15 @@ let goal = {
   height: 10
 };
 
+// 🧤 MAALIVAHTI
+let goalie = {
+  x: 260,
+  y: 20,
+  width: 80,
+  height: 15,
+  speed: 3
+};
+
 let score = 0;
 let keys = {};
 
@@ -62,11 +71,9 @@ document.addEventListener("keydown", e => keys[e.code] = true);
 document.addEventListener("keyup", e => keys[e.code] = false);
 
 function update() {
-  // liike
+  // pelaaja liike
   if (keys["ArrowLeft"]) player.x -= player.speed;
   if (keys["ArrowRight"]) player.x += player.speed;
-
-  // rajat
   player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
 
   // kiekko liike
@@ -86,7 +93,23 @@ function update() {
     puck.vy = -Math.abs(puck.vy);
   }
 
-  // maali
+  // 🧤 MAALIVAHTI AI (seuraa kiekkoa)
+  if (puck.x < goalie.x) goalie.x -= goalie.speed;
+  if (puck.x > goalie.x + goalie.width) goalie.x += goalie.speed;
+
+  // rajat
+  goalie.x = Math.max(0, Math.min(canvas.width - goalie.width, goalie.x));
+
+  // 🧤 TORJUNTA
+  if (
+    puck.y - puck.radius < goalie.y + goalie.height &&
+    puck.x > goalie.x &&
+    puck.x < goalie.x + goalie.width
+  ) {
+    puck.vy = Math.abs(puck.vy); // pomppaa alas
+  }
+
+  // maali (vain jos EI osu maalivahtiin)
   if (
     puck.y - puck.radius <= goal.y + goal.height &&
     puck.x > goal.x &&
@@ -95,7 +118,6 @@ function update() {
     score++;
     document.getElementById("score").textContent = score;
 
-    // reset
     puck.x = 300;
     puck.y = 200;
   }
@@ -103,7 +125,7 @@ function update() {
   // lyönti
   if (keys["Space"]) {
     if (Math.abs(puck.y - player.y) < 30) {
-      puck.vy = -5;
+      puck.vy = -6;
     }
   }
 }
@@ -118,6 +140,10 @@ function draw() {
   // maali
   ctx.fillStyle = "red";
   ctx.fillRect(goal.x, goal.y, goal.width, goal.height);
+
+  // 🧤 maalivahti
+  ctx.fillStyle = "purple";
+  ctx.fillRect(goalie.x, goalie.y, goalie.width, goalie.height);
 
   // pelaaja
   ctx.fillStyle = "blue";
