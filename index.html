@@ -2,20 +2,20 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>NHL Mini FIXED</title>
+<title>NHL FIX</title>
 <style>
 body { margin:0; background:#0b1d2a; color:white; text-align:center; }
 canvas { display:block; margin:auto; background:#e6f7ff; border:3px solid white; }
-button, select { margin:5px; padding:5px; }
+button, select { padding:6px; margin:5px; }
 </style>
 </head>
 <body>
 
-<h2>🏒 NHL Mini (FIXED)</h2>
+<h2>🏒 NHL FIX</h2>
 
 <select id="mode">
   <option value="endless">Endless</option>
-  <option value="time">Time Attack (60s)</option>
+  <option value="time">Time Attack</option>
 </select>
 
 <button onclick="startGame()">Aloita</button>
@@ -32,30 +32,36 @@ let player, puck, goalie;
 let keys = {};
 let score = 0;
 let time = 60;
-let gameMode = "endless";
 let running = false;
+let mode = "endless";
 
-let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+// 🟢 SAFE AUDIO (ei kaada peliä)
+let audioCtx = null;
 
 function beep(freq){
-  let osc = audioCtx.createOscillator();
-  osc.frequency.value = freq;
-  osc.connect(audioCtx.destination);
-  osc.start();
-  setTimeout(()=>osc.stop(),100);
+  try {
+    if(!audioCtx){
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    let osc = audioCtx.createOscillator();
+    osc.frequency.value = freq;
+    osc.connect(audioCtx.destination);
+    osc.start();
+    setTimeout(()=>osc.stop(),100);
+  } catch(e){}
 }
 
-document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
-document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+// 🔑 input fix (ei " " vaan Space)
+document.addEventListener("keydown", e => keys[e.code] = true);
+document.addEventListener("keyup", e => keys[e.code] = false);
 
 function startGame(){
 
-  // 🔊 FIX: ääni toimii selaimessa
-  if (audioCtx.state === "suspended") {
+  if(audioCtx && audioCtx.state === "suspended"){
     audioCtx.resume();
   }
 
-  gameMode = document.getElementById("mode").value;
+  mode = document.getElementById("mode").value;
 
   player = { x:350, y:380, vx:0, vy:0 };
   puck = { x:350, y:250, vx:0, vy:0 };
@@ -65,63 +71,73 @@ function startGame(){
   time = 60;
   running = true;
 
-  document.getElementById("score").textContent = score;
-  document.getElementById("time").textContent = time;
+  document.getElementById("score").textContent = 0;
+  document.getElementById("time").textContent = 60;
 }
 
 function update(){
   if(!running) return;
 
-  // 🧍‍♂️ luistelu
-  if(keys["w"]) player.vy -= 0.2;
-  if(keys["s"]) player.vy += 0.2;
-  if(keys["a"]) player.vx -= 0.2;
-  if(keys["d"]) player.vx += 0.2;
+  // 🧍‍♂️ liike
+  if(keys["KeyW"]) player.vy -= 0.25;
+  if(keys["KeyS"]) player.vy += 0.25;
+  if(keys["KeyA"]) player.vx -= 0.25;
+  if(keys["KeyD"]) player.vx += 0.25;
 
-  player.vx *= 0.95;
-  player.vy *= 0.95;
+  player.vx *= 0.92;
+  player.vy *= 0.92;
 
   player.x += player.vx;
   player.y += player.vy;
 
-  // 🏒 dribble
+  // rajat
+  player.x = Math.max(0, Math.min(canvas.width, player.x));
+  player.y = Math.max(0, Math.min(canvas.height, player.y));
+
+  // 🏒 dribble (kiekko seuraa)
   let dx = puck.x - player.x;
   let dy = puck.y - player.y;
   let dist = Math.sqrt(dx*dx + dy*dy);
 
-  if(dist < 40){
-    puck.vx += dx * -0.02;
-    puck.vy += dy * -0.02;
+  if(dist < 45){
+    puck.vx += dx * -0.03;
+    puck.vy += dy * -0.03;
   }
 
   // kiekko
   puck.x += puck.vx;
   puck.y += puck.vy;
 
-  puck.vx *= 0.99;
-  puck.vy *= 0.99;
+  puck.vx *= 0.98;
+  puck.vy *= 0.98;
 
-  // laukaus
-  if(keys[" "]){
-    puck.vx = (puck.x - player.x) * 0.3;
+  // seinät
+  if(puck.x < 8 || puck.x > 692) puck.vx *= -1;
+  if(puck.y < 8 || puck.y > 442) puck.vy *= -1;
+
+  // 🎯 laukaus (SPACE FIX)
+  if(keys["Space"]){
+    puck.vx = (puck.x - player.x) * 0.25;
     puck.vy = -6;
-    beep(400);
+    beep(350);
   }
 
   // 🧠 maalivahti
   let target = puck.x - 40;
-  goalie.x += (target - goalie.x) * 0.04;
+  goalie.x += (target - goalie.x) * 0.05;
 
   // torjunta
-  if(puck.y < 60 && puck.x > goalie.x && puck.x < goalie.x+80){
+  if(puck.y < 60 &&
+     puck.x > goalie.x &&
+     puck.x < goalie.x + 80){
     puck.vy = Math.abs(puck.vy);
-    puck.vx *= 0.5;
+    puck.vx *= 0.6;
   }
 
-  // maali
-  if(puck.y < 20 && puck.x>300 && puck.x<400){
+  // 🥅 maali
+  if(puck.y < 15 && puck.x > 300 && puck.x < 400){
     score++;
-    beep(800);
+    beep(700);
 
     puck.x = 350;
     puck.y = 250;
@@ -132,17 +148,16 @@ function update(){
   }
 
   // ⏱ aika
-  if(gameMode === "time"){
+  if(mode === "time"){
     time -= 1/60;
     document.getElementById("time").textContent = Math.max(0, Math.floor(time));
 
-    if(time <= 0){
-      running = false;
-    }
+    if(time <= 0) running = false;
   }
 }
 
 function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
   // jää
   ctx.fillStyle="#e6f7ff";
@@ -151,14 +166,14 @@ function draw(){
   // viivat
   ctx.strokeStyle="red";
   ctx.beginPath();
-  ctx.moveTo(0,canvas.height/2);
-  ctx.lineTo(canvas.width,canvas.height/2);
+  ctx.moveTo(0,225);
+  ctx.lineTo(700,225);
   ctx.stroke();
 
   ctx.strokeStyle="blue";
   ctx.beginPath();
   ctx.moveTo(0,150);
-  ctx.lineTo(canvas.width,150);
+  ctx.lineTo(700,150);
   ctx.stroke();
 
   // maalivahti
@@ -172,16 +187,15 @@ function draw(){
   ctx.fill();
 
   // kiekko
+  ctx.fillStyle="black";
   ctx.beginPath();
   ctx.arc(puck.x,puck.y,8,0,Math.PI*2);
-  ctx.fillStyle="black";
   ctx.fill();
 
-  // GAME OVER
   if(!running && time === 0){
     ctx.fillStyle="black";
     ctx.font="40px Arial";
-    ctx.fillText("GAME OVER",250,220);
+    ctx.fillText("GAME OVER",220,220);
   }
 }
 
