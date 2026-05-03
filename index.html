@@ -376,6 +376,9 @@ function shoot(){
  let p = active();
  if(!p || !puck) return;
 
+ if(puckOwner !== controlled) return;
+
+ // 🎯 aim vector (hiiri)
  let dx = mouse.x;
  let dz = mouse.y;
 
@@ -385,13 +388,29 @@ function shoot(){
  dx /= len;
  dz /= len;
 
- vx = dx * 5.5;
- vz = dz * 5.5;
- vy = Math.max(0, -mouse.y * 2.2);
+ // 🔥 REALISTIC SPREAD (ei laser-tarkkuutta)
+ const spread = 0.18; // 👈 säädä vaikeutta
+
+ dx += (Math.random()-0.5)*spread;
+ dz += (Math.random()-0.5)*spread;
+
+ // normalisointi uudelleen
+ let len2 = Math.hypot(dx,dz);
+ dx /= len2;
+ dz /= len2;
+
+ // 🏒 voima
+ const power = 5.2;
+
+ vx = dx * power;
+ vz = dz * power;
+
+ // 🎯 korkeus (nyt EI aina ylös)
+ vy = (-mouse.y * 2.0) + (Math.random()-0.5)*0.4;
+
+ // 🧠 vapautus
+ puckOwner = null;
 }
-
-addEventListener("mousedown",shoot);
-
 /////////////////////////////////////////////////////
 // PASS
 /////////////////////////////////////////////////////
