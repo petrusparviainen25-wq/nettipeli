@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>Realistisempi Jääkiekko</title>
+<title>Jääkiekko peli</title>
 <style>
   body {
     margin: 0;
@@ -22,7 +22,7 @@
 </head>
 <body>
 
-<h2>🏒 Jääkiekko (Realistisempi)</h2>
+<h2>🏒 Jääkiekko</h2>
 <p>← → liiku | SPACE = lyönti</p>
 <p>Pisteet: <span id="score">0</span></p>
 
@@ -32,80 +32,51 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-let player = {
-  x: 280,
-  y: 330,
-  width: 40,
-  height: 20,
-  speed: 5
-};
+let player = { x: 280, y: 330, width: 40, height: 20, speed: 5 };
 
-let puck = {
-  x: 300,
-  y: 200,
-  radius: 10,
-  vx: 2,
-  vy: 2
-};
+let puck = { x: 300, y: 200, radius: 10, vx: 2, vy: 2 };
 
-let goal = {
-  x: 250,
-  y: 0,
-  width: 100,
-  height: 10
-};
+let goal = { x: 250, y: 0, width: 100, height: 60 };
 
-let goalie = {
-  x: 260,
-  y: 20,
-  width: 80,
-  height: 15,
-  speed: 2.5
-};
+let goalie = { x: 260, y: 20, width: 80, height: 15 };
 
 let score = 0;
 let keys = {};
+let goalAnim = 0;
 
 document.addEventListener("keydown", e => keys[e.code] = true);
 document.addEventListener("keyup", e => keys[e.code] = false);
 
 function update() {
 
-  // 🧍 pelaaja liike
+  // pelaaja
   if (keys["ArrowLeft"]) player.x -= player.speed;
   if (keys["ArrowRight"]) player.x += player.speed;
   player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
 
-  // 🏒 kiekon liike
+  // kiekko
   puck.x += puck.vx;
   puck.y += puck.vy;
 
-  // ⚡ kitka (hidastaa)
   puck.vx *= 0.99;
   puck.vy *= 0.99;
 
-  // seinät (kulmat säilyy)
-  if (puck.x < puck.radius || puck.x > canvas.width - puck.radius) {
-    puck.vx *= -1;
-  }
+  // seinät
+  if (puck.x < puck.radius || puck.x > canvas.width - puck.radius) puck.vx *= -1;
+  if (puck.y > canvas.height - puck.radius) puck.vy *= -1;
 
-  if (puck.y < puck.radius || puck.y > canvas.height - puck.radius) {
-    puck.vy *= -1;
-  }
-
-  // 🏒 maila osuma (kulma riippuu osumasta)
+  // maila
   if (
     puck.y + puck.radius > player.y &&
     puck.x > player.x &&
     puck.x < player.x + player.width
   ) {
-    let hitPos = (puck.x - (player.x + player.width / 2)) / 20;
-
-    puck.vx = hitPos * 2; // kulma
+    let hit = (puck.x - (player.x + player.width / 2)) / 20;
+    puck.vx = hit * 2;
     puck.vy = -5;
   }
 
-  // 💥 SPACE lyönti (lisävoima)
+  // lyönti
   if (keys["Space"]) {
     let dx = puck.x - (player.x + player.width / 2);
     let dy = puck.y - player.y;
@@ -117,15 +88,12 @@ function update() {
     }
   }
 
-  // 🧠 maalivahti (ei täydellinen)
+  // maalivahti
   let target = puck.x - goalie.width / 2;
-
-  // pieni viive/liike-epätarkkuus
   goalie.x += (target - goalie.x) * 0.05;
-
   goalie.x = Math.max(0, Math.min(canvas.width - goalie.width, goalie.x));
 
-  // 🧤 torjunta (kulma muuttuu)
+  // torjunta
   if (
     puck.y - puck.radius < goalie.y + goalie.height &&
     puck.x > goalie.x &&
@@ -136,7 +104,7 @@ function update() {
     puck.vy = Math.abs(puck.vy);
   }
 
-  // 🥅 maali
+  // 🥅 MAALI
   if (
     puck.y - puck.radius <= goal.y + goal.height &&
     puck.x > goal.x &&
@@ -145,10 +113,47 @@ function update() {
     score++;
     document.getElementById("score").textContent = score;
 
+    goalAnim = 20; // käynnistä animaatio
+
     puck.x = 300;
     puck.y = 200;
     puck.vx = 2;
     puck.vy = 2;
+  }
+
+  if (goalAnim > 0) goalAnim--;
+}
+
+function drawGoal() {
+  // tolpat
+  ctx.strokeStyle = "red";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(goal.x, goal.y, goal.width, goal.height);
+
+  // verkko
+  ctx.strokeStyle = "rgba(200,200,200,0.6)";
+  ctx.lineWidth = 1;
+
+  let offset = goalAnim % 5; // animaatio heilunta
+
+  for (let i = 0; i < goal.width; i += 10) {
+    ctx.beginPath();
+    ctx.moveTo(goal.x + i + offset, goal.y);
+    ctx.lineTo(goal.x + i, goal.y + goal.height);
+    ctx.stroke();
+  }
+
+  for (let i = 0; i < goal.height; i += 10) {
+    ctx.beginPath();
+    ctx.moveTo(goal.x, goal.y + i);
+    ctx.lineTo(goal.x + goal.width, goal.y + i + offset);
+    ctx.stroke();
+  }
+
+  // maali flash
+  if (goalAnim > 0) {
+    ctx.fillStyle = "rgba(255,255,0,0.3)";
+    ctx.fillRect(goal.x, goal.y, goal.width, goal.height);
   }
 }
 
@@ -159,9 +164,8 @@ function draw() {
   ctx.fillStyle = "#e6f7ff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // maali
-  ctx.fillStyle = "red";
-  ctx.fillRect(goal.x, goal.y, goal.width, goal.height);
+  // 🥅 maali + verkko
+  drawGoal();
 
   // maalivahti
   ctx.fillStyle = "purple";
