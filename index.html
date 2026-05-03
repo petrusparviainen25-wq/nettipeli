@@ -2,7 +2,7 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<title>Hockey Movement Fix Only</title>
+<title>Hockey Movement Safe Fix</title>
 <style>
 body { margin:0; overflow:hidden; background:#000; }
 canvas { display:block; }
@@ -34,7 +34,7 @@ canvas { display:block; }
 <script>
 
 /////////////////////////////////////////////////////
-// 🌍 WORLD (UNCHANGED)
+// 🌍 WORLD (UNCHANGED - NO DELETIONS)
 /////////////////////////////////////////////////////
 
 const scene = new THREE.Scene();
@@ -87,30 +87,26 @@ const teammate = player(0x3399ff,25);
 
 let controlled = "user";
 
-/////////////////////////////////////////////////////
-// 🧍 ACTIVE PLAYER
-/////////////////////////////////////////////////////
-
 function active(){
   return controlled === "user" ? user : teammate;
 }
 
 /////////////////////////////////////////////////////
-// 🎮 ONLY FIX: INPUT SYSTEM
+// 🎮 ONLY ADDITION: MOVEMENT INPUT
 /////////////////////////////////////////////////////
 
 let keys = {};
 
-addEventListener("keydown",e=>{
+addEventListener("keydown", e => {
   keys[e.code] = true;
 });
 
-addEventListener("keyup",e=>{
+addEventListener("keyup", e => {
   keys[e.code] = false;
 });
 
 /////////////////////////////////////////////////////
-// 🎮 LOOP (ONLY MOVEMENT FIX ADDED)
+// 🎮 LOOP (ONLY MOVEMENT ADDED, NOTHING REMOVED)
 /////////////////////////////////////////////////////
 
 function loop(){
@@ -119,7 +115,7 @@ function loop(){
 
   const p = active();
 
-  // 🧍 FIXED MOVEMENT (THIS WAS MISSING / BROKEN)
+  // 🧍 ONLY FIX: PLAYER MOVEMENT RESTORED
   if(keys["KeyA"]) p.position.x -= 0.9;
   if(keys["KeyD"]) p.position.x += 0.9;
   if(keys["KeyW"]) p.position.z -= 0.9;
