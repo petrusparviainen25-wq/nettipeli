@@ -181,41 +181,47 @@ function pickup(){
 /////////////////////////////////////////////////////
 // 🏒 SHOOT (REALISTIC + HEIGHT)
 /////////////////////////////////////////////////////
-
 function shoot(){
 
-  if(owner !== controlled) return;
+  // 🟢 VARMA TRIGGER (ei jää owner-checkiin jumiin)
+  if(!controlled) return;
   if(lock) return;
 
   lock = true;
 
-  // 🎯 direction based on mouse
   let dx = mouse.x;
   let dz = mouse.y;
 
   let len = Math.sqrt(dx*dx + dz*dz);
-  if(len === 0){ lock = false; return; }
 
-  // 🎯 94% accuracy (small controlled error)
+  // 🟢 fallback jos osoitus keskellä (ESTÄÄ “ei lähde” bugia)
+  if(len < 0.001){
+    dx = 0;
+    dz = -1;
+    len = 1;
+  }
+
+  // 🎯 94% tarkkuus (kevyt, ei estä lähtöä)
   const accuracy = 0.94;
-  const error = (1 - accuracy);
+  const err = (1 - accuracy);
 
-  dx += (Math.random() - 0.5) * error * 0.8;
-  dz += (Math.random() - 0.5) * error * 0.8;
+  dx += (Math.random()-0.5) * err;
+  dz += (Math.random()-0.5) * err;
 
-  // 🏒 shot power
   const power = 3.2;
 
-  vx = (dx / len) * power;
-  vz = (dz / len) * power;
+  vx = (dx/len) * power;
+  vz = (dz/len) * power;
 
-  // 🟢 height from aim (no physics break)
+  // 🟢 korkeus (ei riko physicsiä)
   vy = Math.max(0, -mouse.y * 1.6);
 
+  // 🟢 VAIN tämä vapauttaa kiekon varmasti
   owner = "free";
 
-  setTimeout(() => lock = false, 80);
-}/////////////////////////////////////////////////////
+  setTimeout(()=>lock=false,60);
+}
+/////////////////////////////////////////////////////
 // 🤝 PASS
 /////////////////////////////////////////////////////
 
